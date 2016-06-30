@@ -21,17 +21,20 @@ Object.assign(Morph.prototype, {
 });
 
 var wbounds = world.bounds(), morphs = [];
-for (var i = 0; i < 1000; i++) {
+for (var i = 0; i < 10000; i++) {
   var m = new Morph({
     position: wbounds.insetBy(10).randomPoint(),
     extent: Point.random(pt(10,10)).addXY(10,10),
     fill: Color.random()
   });
   m.velocity = Point.random(pt(10,10));
+  world.addMorph(m)
+  if (Math.random()*100 > 90)
   morphs.push(world.addMorph(m))
 }
 
 (function loop() {
+  
   morphs.forEach(ea => ea.bounce());
   requestAnimationFrame(loop);
 })();
