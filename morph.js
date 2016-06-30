@@ -7,25 +7,65 @@ const defaultProperties = {
   extent:  pt(10, 10),
   fill:  Color.white,
   clipMode:  "visible",
-  _submorphs: []
+  submorphs:  []
 }
 
 export class Morph {
 
   constructor(props) {
     this._owner = null;
+    this._changes = []
+    this._pendingChanges = [];
     this._dirty = true; // for initial display
-    Object.assign(this, defaultProperties, props);
-    this._submorphs = this._submorphs.slice();
+    this._propCache = {}
+    Object.assign(this, props);
+  }
+
+  defaultProperty(key) { return defaultProperties[key]; }
+
+  getProperty(key) {
+     var c = this.lastChangeFor(key);
+     return c ? c.value : this.defaultProperty(key); 
   }
 
   // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
   // changes
   // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
+  lastChangeFor(prop, onlyCommited) {
+    if (this._propCache[prop]) return this._propCache[prop];
+    for (var i = this._pendingChanges.length - 1; i >= 0; i--)
+      if (this._pendingChanges[i].prop === prop) return this._propCache[prop] = this._pendingChanges[i];
+    for (var i = this._changes.length - 1; i >= 0; i--)
+      if (this._changes[i].prop === prop) return this._propCache[prop] = this._changes[i];
+    return null;
+  }
+
   change(change) {
+    this._propCache[change.prop] = change;
+    this._pendingChanges.push(change);
     this.makeDirty();
     return change;
+  }
+
+  hasPendingChanges() { return !!this._pendingChanges.length; }
+
+  commitChanges() {
+    this._changes = this._changes.concat(this._pendingChanges);
+    this._pendingChanges = [];
+    if (this._changes.length > 1000) this.compactChanges();
+  }
+
+  compactChanges() {
+    var seen = {};
+    this._changes = this._changes.reduceRight((changes, change) => {
+      if (!(change.prop in seen)) {
+        changes.push(change);
+        seen[change.prop] = true;
+      }
+      return changes;
+    }, []);
+    this._propCache = {};
   }
 
   // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -38,10 +78,11 @@ export class Morph {
   }
 
   needsRerender() {
-    return !!this._dirty;
+    return this._dirty || !!this._pendingChanges.length;
   }
   
   aboutToRender() {
+    this.commitChanges();
     this._dirty = false;
   }
 
@@ -49,38 +90,35 @@ export class Morph {
   // morphic interface
   // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-  get position()       { return this._position; }
-  set position(value)  { this._position = value; this.makeDirty(); }
+  get position()       { return this.getProperty("position"); }
+  set position(value)  { this.change({prop: "position", value}); }
 
-  get scale()          { return this._scale; }
-  set scale(value)     { this._scale = value; this.makeDirty(); }
+  get scale()          { return this.getProperty("scale"); }
+  set scale(value)     { this.change({prop: "scale", value}); }
 
-  get rotation()       { return this._rotation; }
-  set rotation(value)  { this._rotation = value; this.makeDirty(); }
+  get rotation()       { return this.getProperty("rotation"); }
+  set rotation(value)  { this.change({prop: "rotation", value}); }
 
-  get extent()         { return this._extent; }
-  set extent(value)    { this._extent = value; this.makeDirty(); }
+  get extent()         { return this.getProperty("extent"); }
+  set extent(value)    { this.change({prop: "extent", value}); }
 
-  get fill()           { return this._fill; }
-  set fill(value)      { this._fill = value; this.makeDirty(); }
+  get fill()           { return this.getProperty("fill"); }
+  set fill(value)      { this.change({prop: "fill", value}); }
 
-  get clipMode()       { return this._clipMode; }
-  set clipMode(value)  { this._clipMode = value; this.makeDirty(); }
+  get clipMode()       { return this.getProperty("clipMode"); }
+  set clipMode(value)  { this.change({prop: "clipMode", value}); }
 
-  get submorphs()      { return this._submorphs; }
+  get submorphs()      { return this.getProperty("submorphs"); }
   addMorph(morph) {
     morph._owner = this;
-    this._submorphs.push(morph)
-    this.makeDirty();
+    this.change({prop: "submorphs", value: this.submorphs.concat(morph)});
     return morph;
   }
   remove() {
     var o = this.owner;
     if (o) {
       this._owner = null;
-      var index = o._submorphs.indexOf(this);
-      if (index > -1) o._submorphs.splice(index, 1);
-      o.makeDirty();
+      o.change({prop: "submorphs", value: o.submorphs.filter(ea => ea !== this)});
     }
   }
   get owner() { return this._owner; }
@@ -98,4 +136,13 @@ export class Morph {
   moveBy(delta) { this.position = this.position.addPt(delta); }
   resizeBy(delta) { this.extent = this.extent.addPt(delta); }
 
+  // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-  
+  // undo / redo
+  // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+  undo() {
+    // fixme redo stack
+    this._changes.pop();
+    this.makeDirty();
+  }
 }
