@@ -17,6 +17,7 @@ export class Morph {
     this._changes = []
     this._pendingChanges = [];
     this._dirty = true; // for initial display
+    this._propCache = {}
     Object.assign(this, props);
   }
 
@@ -32,11 +33,16 @@ export class Morph {
   // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
   lastChangeFor(prop, onlyCommited) {
-    var changes = this._changes.concat(onlyCommited ? [] : this._pendingChanges);
-    return changes.reverse().find(ea => ea.prop === prop);
+    if (this._propCache[prop]) return this._propCache[prop];
+    for (var i = this._pendingChanges.length - 1; i >= 0; i--)
+      if (this._pendingChanges[i].prop === prop) return this._propCache[prop] = this._pendingChanges[i];
+    for (var i = this._changes.length - 1; i >= 0; i--)
+      if (this._changes[i].prop === prop) return this._propCache[prop] = this._changes[i];
+    return null;
   }
 
   change(change) {
+    this._propCache[change.prop] = change;
     this._pendingChanges.push(change);
     this.makeDirty();
     return change;
@@ -47,6 +53,19 @@ export class Morph {
   commitChanges() {
     this._changes = this._changes.concat(this._pendingChanges);
     this._pendingChanges = [];
+    if (this._changes.length > 100) this.compactChanges();
+  }
+
+  compactChanges() {
+    var seen = {};
+    this._changes = this._changes.reduceRight((changes, change) => {
+      if (!(change.prop in seen)) {
+        changes.push(change);
+        seen[change.prop] = true;
+      }
+      return changes;
+    }, []);
+    this._propCache = {};
   }
 
   // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
