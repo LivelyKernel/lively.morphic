@@ -88,6 +88,23 @@ describe("morphic", () => {
       expect(renderer.domNode.childNodes[0].childNodes[0]).equals(node); // brittle, might change...
     });
 
+    it("reuses existing DOM", () => {
+      const node = renderer.getNodeForMorph(submorph2),
+            worldB = morph({
+              type: "world", name: "world", extent: pt(300,300),
+              submorphs: [{
+              name: "submorph1", extent: pt(100,100), position: pt(10,10), fill: Color.red,
+              submorphs: [{name: "submorph2", extent: pt(20,20), position: pt(5,10), fill: Color.green}]
+              }]
+            }),
+            submorph2B = worldB.submorphs[0].submorphs[0],
+            rendererB = new Renderer(worldB, domEnv.document.body, domEnv);
+      rendererB.renderWorld();
+
+      const nodeB = rendererB.getNodeForMorph(submorph2B);
+      expect(node).equals(nodeB, "rendering reuses existing DOM nodes");
+    });
+
   });
 
   describe("morph lookup", () => {
