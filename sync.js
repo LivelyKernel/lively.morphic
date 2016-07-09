@@ -1,5 +1,93 @@
-import { arr, string, obj } from "lively.lang";
+import { arr, string, obj, promise, fun } from "lively.lang";
 import { morph } from "./index.js";
+
+var i = val => obj.inspect(val, {maxDepth: 2}),
+    assert = (bool, msgFn) => { if (!bool) throw new Error(msgFn()); }
+
+
+// -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// change (de)serialization
+// -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+function deserializeChangeProp(change, name, val, objectMap) {
+  if (!val || val.isMorph) return val;
+
+  if (typeof val === "string" && objectMap.has(val)) {
+    console.warn(`deserializeChange: Found prop [${name}] that is a morph id but is not specified as one!`);
+    return objectMap.get(val);
+  }
+
+  if (val.type === "lively-sync-morph-ref") {
+    var resolved = objectMap.get(val.id);
+    assert(resolved, () => `Cannot deserialize change ${i(change)}[${name}], cannot find ref ${val.id} (property ${name})`);
+    return resolved;
+  }
+
+  if (val.type === "lively-sync-morph-spec") {
+    var resolved = objectMap.get(val.spec._id)
+    if (!resolved) {
+      resolved = morph(val.spec, {restore: true});
+      objectMap.set(val.spec._id, resolved);
+    }
+    assert(resolved, () => `Cannot deserialize change ${i(change)}[${name}], cannot create morph from spec ${val.spec}`);
+    return resolved;
+  }
+
+  return val;
+}
+
+function deserializeChange(change, objectMap) {
+  var deserializedChange = obj.clone(change);
+
+  if (change.target)
+    deserializedChange.target = deserializeChangeProp(change, "target", change.target, objectMap);
+
+  if (change.type === "setter") {
+    deserializedChange.value = deserializeChangeProp(change, "value", change.value, objectMap);
+
+  } else if (change.type === "method-call") {
+    deserializedChange.receiver = deserializeChangeProp(change, "receiver", change.receiver, objectMap);
+    deserializedChange.args = change.args.map((arg, i) => deserializeChangeProp(change, `args[${i}]`, arg, objectMap))
+
+  } else {
+    assert(false, () => `Unknown change type ${change.type}, ${i(change)}`);
+  }
+
+  return deserializedChange;
+}
+
+
+function serializeChangeProp(change, name, val, objectMap, opts = {forceMorphId: false}) {
+  if (!val) return val;
+
+  if (val.isMorph) {
+    if (!objectMap.has(val.id))
+      objectMap.set(val.id, val);
+    return opts.forceMorphId ?
+      {type: "lively-sync-morph-ref", id: val.id} :
+      {type: "lively-sync-morph-spec", spec: val.exportToJSON()};
+  }
+
+  return val;
+}
+
+function serializeChange(change, objectMap) {
+  var serializedChange = obj.clone(change);
+
+  if (change.target)
+    serializedChange.target = serializeChangeProp(change, "target", change.target, objectMap, {forceMorphId: true});
+
+  if (change.type === "setter") {
+    serializedChange.value = serializeChangeProp(change, "value", change.value, objectMap);
+  } else if (change.type === "method-call") {
+    serializedChange.receiver = serializeChangeProp(change, "receiver", change.receiver, objectMap, {forceMorphId: true});
+    serializedChange.args = change.args.map((arg,i) => serializeChangeProp(change, `arg[${i}]`, arg, objectMap));
+  } else {
+    assert(false, () => `Unknown change type ${change.type}, ${i(change)}`);
+  }
+
+  return serializedChange;
+}
 
 function applyChange(change, syncController) {
   // FIXME...
@@ -304,4 +392,86 @@ export class Master {
     return {transformedOp: op, transformedAgainstOps: againstOps}
   }
 
+}
+function deserializeChangeProp(change, name, val, objectMap) {
+  if (!val || val.isMorph) return val;
+
+  if (typeof val === "string" && objectMap.has(val)) {
+    console.warn(`deserializeChange: Found prop [${name}] that is a morph id but is not specified as one!`);
+    return objectMap.get(val);
+  }
+
+  if (val.type === "lively-sync-morph-ref") {
+    var resolved = objectMap.get(val.id);
+    assert(resolved, () => `Cannot deserialize change ${i(change)}[${name}], cannot find ref ${val.id} (property ${name})`);
+    return resolved;
+  }
+
+  if (val.type === "lively-sync-morph-spec") {
+    var resolved = objectMap.get(val.spec._id)
+    if (!resolved) {
+      resolved = morph(val.spec, {restore: true});
+      objectMap.set(val.spec._id, resolved);
+    }
+    assert(resolved, () => `Cannot deserialize change ${i(change)}[${name}], cannot create morph from spec ${val.spec}`);
+    return resolved;
+  }
+
+  return val;
+}
+
+function deserializeChange(change, objectMap) {
+  var deserializedChange = obj.clone(change);
+
+  if (change.target)
+    deserializedChange.target = deserializeChangeProp(change, "target", change.target, objectMap);
+
+  if (change.type === "setter") {
+    deserializedChange.value = deserializeChangeProp(change, "value", change.value, objectMap);
+
+  } else if (change.type === "method-call") {
+    deserializedChange.receiver = deserializeChangeProp(change, "receiver", change.receiver, objectMap);
+    deserializedChange.args = change.args.map((arg, i) => deserializeChangeProp(change, `args[${i}]`, arg, objectMap))
+
+  } else {
+    assert(false, () => `Unknown change type ${change.type}, ${i(change)}`);
+  }
+
+  return deserializedChange;
+}
+
+
+function serializeChangeProp(change, name, val, objectMap, opts = {forceMorphId: false}) {
+  if (!val) return val;
+
+  if (val.isMorph) {
+    if (!objectMap.has(val.id))
+      objectMap.set(val.id, val);
+    return opts.forceMorphId ?
+      {type: "lively-sync-morph-ref", id: val.id} :
+      {type: "lively-sync-morph-spec", spec: val.exportToJSON()};
+  }
+
+  return val;
+}
+// -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+// change (de)serialization
+// -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+function serializeChange(change, objectMap) {
+  var serializedChange = obj.clone(change);
+
+  if (change.target)
+    serializedChange.target = serializeChangeProp(change, "target", change.target, objectMap, {forceMorphId: true});
+
+  if (change.type === "setter") {
+    serializedChange.value = serializeChangeProp(change, "value", change.value, objectMap);
+  } else if (change.type === "method-call") {
+    serializedChange.receiver = serializeChangeProp(change, "receiver", change.receiver, objectMap, {forceMorphId: true});
+    serializedChange.args = change.args.map((arg,i) => serializeChangeProp(change, `arg[${i}]`, arg, objectMap));
+  } else {
+    assert(false, () => `Unknown change type ${change.type}, ${i(change)}`);
+  }
+
+  return serializedChange;
 }
