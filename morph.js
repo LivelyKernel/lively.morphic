@@ -33,7 +33,7 @@ const defaultProperties = {
   clipMode: "visible",
   reactsToPointer: true,
   draggable: true,
-  grabbable: false,
+  grabbable: true,
   dropShadow: false,
   styleClasses: ["morph"],
   submorphs:  []
