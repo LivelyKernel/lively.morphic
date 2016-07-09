@@ -138,9 +138,11 @@ describe("syncing master with two clients", function() {
     expect(master.history[1]).to.containSubset({components: [{type: "setter", prop: "position", value: pt(14,14)}]})
   });
 
-  xit("sync image", async () => {
-    var m = env1.world.addMorph({type: "image", extent: pt(50,50)});
+  it("sync image", async () => {
+    var {world1, client1, env2} = state;
+    var m = world1.addMorph({type: "image", extent: pt(50,50)});
     await client1.synced();
+    // make sure it is rendered correctly
     expect(env2.renderer.getNodeForMorph(env2.world.submorphs[0])).property("tagName", "IMG");
   });
 });
