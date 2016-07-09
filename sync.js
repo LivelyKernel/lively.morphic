@@ -236,10 +236,19 @@ class Channel {
     this.delayAtoB = 0;
     this.delayBtoA = 0;
     this.lifetime = 5;
-    this.debug = true;
+    this.debug = false;
   }
 
   isOnline() { return true; }
+
+  watchdogProcess() {
+    setTimeout(() => {
+      if (this.queueAtoB.length) this.send([], this.senderRecvrA);
+      else if (this.queueBtoA.length) this.send([], this.senderRecvrB);
+      else return;
+      this.watchdogProcess();
+    }, 100);
+  }
 
   send(content, sender) {
     if (sender !== this.senderRecvrA && sender !== this.senderRecvrB)
@@ -262,20 +271,32 @@ class Channel {
     
     queue.push(...(Array.isArray(content) ? content : [content]));
 
+    this.watchdogProcess();
+
     // try again later...
-    if (!this.isOnline()) return setTimeout(() => this.send([], sender), 200);
+    if (!this.isOnline()) return;
 
     return Promise.resolve().then(() =>
-      new Promise((resolve, reject) =>
-        fun.throttleNamed(`${this.id}-${descr}`, delay, () => {
-          try {
-            recvr[method](queue, sender, this);
-            resolve();
-          } catch (e) {
-            console.error(`Error in ${method} of ${recvr}: ${e.stack || e}`);
-            reject(e);
-          } finally { queue.length = 0; }
-        })()))
+      new Promise((resolve, reject) => {
+        try {
+          recvr[method](queue, sender, this);
+          resolve();
+        } catch (e) {
+          console.error(`Error in ${method} of ${recvr}: ${e.stack || e}`);
+          reject(e);
+        } finally { queue.length = 0; }
+      })
+      // new Promise((resolve, reject) =>
+      //   fun.throttleNamed(`${this.id}-${descr}`, delay, () => {
+      //     try {
+      //       recvr[method](queue, sender, this);
+      //       resolve();
+      //     } catch (e) {
+      //       console.error(`Error in ${method} of ${recvr}: ${e.stack || e}`);
+      //       reject(e);
+      //     } finally { queue.length = 0; }
+      //   })())
+        )
         .catch(err => {
           console.error(`Error in channel.send ${sender} -> ${recvr}: ${err}`);
           throw err;
