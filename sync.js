@@ -249,15 +249,28 @@ class Channel {
     this.debug = false;
   }
 
-  isOnline() { return true; }
+  isOnline() { return this.online; }
+  goOffline() { this.online = false; }
+  goOnline() { this.online = true; this.watchdogProcess(); }
 
   watchdogProcess() {
+    if (!this.isOnline()) return;
     setTimeout(() => {
       if (this.queueAtoB.length) this.send([], this.senderRecvrA);
       else if (this.queueBtoA.length) this.send([], this.senderRecvrB);
       else return;
       this.watchdogProcess();
-    }, 100);
+    }, 100 + num.random(50));
+  }
+
+  isEmpty() {
+    return !this.queueBtoA.length && !this.queueAtoB.length;
+  }
+
+  waitForDelivery() {
+    return Promise.all([
+      this.queueAtoB.length ? this.send([], this.senderRecvrA) : Promise.resolve(),
+      this.queueBtoA.length ? this.send([], this.senderRecvrB) : Promise.resolve()]);
   }
 
   send(content, sender) {
@@ -633,3 +646,28 @@ export class Master {
   transform(op, againstOps) { return transformOp_1_to_n(op, againstOps, this.state.transformFunctions); }
 
 }
+    this.goOnline();
+    this.goOnline();
+  }
+  goOffline() {
+    var {opChannel, metaChannel} = this.state.connection;
+    opChannel.goOffline();
+    metaChannel.goOffline();
+  }
+
+  goOnline() {
+    var {opChannel, metaChannel} = this.state.connection;
+    opChannel.goOnline();
+    metaChannel.goOnline();
+  }
+
+  hasConnection() {
+    var {opChannel, metaChannel} = this.state.connection;
+    return !!opChannel && !!metaChannel;
+  }
+
+  isOnline() {
+    var {opChannel, metaChannel} = this.state.connection;
+    return this.hasConnection() && opChannel.isOnline() && metaChannel.isOnline();
+  }
+
