@@ -59,12 +59,24 @@ describe("messaging between master and client", () => {
   afterEach(async () => teardown());
 
   it("single op", async () => {
-    state.world1.fill = Color.green;
+    var {world1, masterWorld, client1, master} = state;
+    world1.fill = Color.green;
     await promise.delay(30);
-    expect(state.master.history).to.have.length(1);
-    expect(state.client1.history).to.have.length(1);
-    expect(state.client1.buffer).to.have.length(0);
-    expect(state.masterWorld.fill).equals(Color.green);
+    expect(master.history).to.have.length(1);
+    expect(client1.history).to.have.length(1);
+    expect(client1.buffer).to.have.length(0);
+    expect(masterWorld.fill).equals(Color.green);
+  });
+
+  it("version numbers", async () => {
+    var {world1, masterWorld, client1, master} = state;
+    world1.fill = Color.green;
+    world1.fill = Color.red;
+    await client1.synced();
+    expect(master.history).to.have.length(2);
+    expect(client1.history).to.have.length(2);
+    expect(master.history).containSubset([{version: 0}, {version: 1}]);
+    expect(client1.history).containSubset([{version: 0}, {version: 1}]);
   });
 
 });
@@ -216,20 +228,27 @@ describe("syncing master with two clients", function() {
   });
 
   it("simple conflicting prop change is transformed", async () => {
+
+    // setup(2)
+    // teardown();
+
     var {world1, world2, masterWorld, client1, client2, master} = state;
 
-var tfm = (op1In, op2In) => {
-  var op1 = lively.lang.obj.clone(op1In),
-      op2 = lively.lang.obj.clone(op2In);
-  var v1 = op1.change.value, v2 = op2.change.value;
-  var resolvedValue = op1.creator < op2.creator ? v1 : v2
+var tfm = (op1, op2) => {
+  var v1 = op1.change.value,
+      v2 = op2.change.value,
+      // resolvedValue = v1.mixedWith(v2, 0.5)
+      resolvedValue = op1.creator < op2.creator ? v1 : v2
   op1.change.value = resolvedValue;
   op2.change.value = resolvedValue;
   return {op1, op2}
 }
-client1.changeTransform(tfm)
-client2.changeTransform(tfm)
-master.changeTransform(tfm)
+
+// await client1.addTransform(tfm)
+
+client1.state.transformFunctions = [tfm];
+client2.state.transformFunctions = [tfm];
+master.state.transformFunctions =  [tfm];
 
     world1.fill = Color.green;
     world2.fill = Color.blue;

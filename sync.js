@@ -153,8 +153,8 @@ function printChange(change) {
 }
 
 function printOp(op) {
-  var {id, parent, change} = op;
-  return `${printUUID(id)} < ${printUUID(parent)} | ${printChange(change)}`
+  var {id, parent, change, creator, version} = op;
+  return `${printUUID(id)} < ${printUUID(parent)} | ${printUUID(version)} | ${printChange(change)} | ${creator}`
 }
 
 function printOps(ops) { return ops.map(printOp).join("\n"); }
@@ -177,18 +177,22 @@ function morphicDefaultTransform(op1, op2, syncer) {
   if (c1.prop === "position" && c2.prop === "position"
    && c1.type === "setter" && c2.type === "setter"
    && c1.target.id === c2.target.id
-   && c1.owner.id === c2.owner.id
-   && !c1.target.id.match(/Hand/i)) {
+   && c1.owner.id === c2.owner.id) {
      op1.change = op2.change = Object.assign({}, op1.change, {
        value: c1.value.addPt(c2.value.subPt(c1.value).scaleBy(.5))})
 
-function runTransforms(op1, op2, tfmFns) {
+    return {op1, op2, handled: true}
+  }
+
+  return {op1, op2, handled: false};
+}
+
+function runTransforms(op1, op2, tfmFns, syncer) {
   op1 = obj.clone(op1),
   op2 = obj.clone(op2);
-
   for (let tfmFn of tfmFns) {
     try {
-      var {op1, op2, handled} = tfmFn(op1, op2);
+      var {op1, op2, handled} = tfmFn(op1, op2, syncer);
       if (handled) break;
     } catch (e) {
       console.error(`Error while transforming ${op1} with ${op2}:\n ${e.stack || e}`);
@@ -197,22 +201,27 @@ function runTransforms(op1, op2, tfmFns) {
 
   op1.parent = op2.id;
   op2.parent = op1.id;
+  var v1 = op2.version + 1,
+      v2 = op1.version + 1;
+  op1.version = v1;
+  op2.version = v2;
+
   return {op1, op2};
 }
 
-function transformOp_1_to_n(op, againstOps, transformFns = []) {
+function transformOp_1_to_n(op, againstOps, transformFns = [], syncer) {
   // transform an op against other ops
   if (!againstOps.length)
     return {transformedOp: op, transformedAgainstOps: []}
 
   var op2 = op, transformedAgainstOps = [];
   for (let op1 of againstOps) {
-    var {op1, op2} = runTransforms(op1, op2, transformFns);
+    var {op1, op2} = runTransforms(op1, op2, transformFns, syncer);
     transformedAgainstOps.push(op1);
   }
-  return {transformedOp: op2, transformedAgainstOps: againstOps}
-}
 
+  return {transformedOp: op2, transformedAgainstOps}
+}
 
 
 
@@ -245,7 +254,7 @@ function composeOpPair(op1, op2) {
 // communication channel
 // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 class Channel {
-  
+
   constructor(senderRecvrA, onReceivedMethodA, senderRecvrB, onReceivedMethodB) {
     if (!senderRecvrA) throw new Error("no sender / receiver a!");
     if (!senderRecvrB) throw new Error("no sender / receiver b!");
@@ -262,7 +271,7 @@ class Channel {
     this.delayAtoB = 0;
     this.delayBtoA = 0;
     this.online = false;
-    this.debug = true;
+    this.debug = false;
     this.lifetime = 100;
 
     this.goOnline();
@@ -297,6 +306,7 @@ class Channel {
   }
 
   send(content, sender) {
+
     if (sender !== this.senderRecvrA && sender !== this.senderRecvrB)
       throw new Error(`send called with sender unknown to channel: ${sender}`);
 
@@ -315,7 +325,7 @@ class Channel {
       else string += "\n  " + msgs.join("\n  ");
       console.log(string);
     }
-    
+
     queue.push(...(Array.isArray(content) ? content : [content]));
 
     this.watchdogProcess();
@@ -371,7 +381,7 @@ export class ClientState {
     this.isApplyingChange = false;
     this.connection = {opChannel: null, metaChannel: null};
     this.metaMessageCallbacks = {};
-    this.transformFunctions = [];
+    this.transformFunctions = [morphicDefaultTransform];
     this.delay = 0;
   }
 
@@ -494,6 +504,22 @@ export class Client {
   }
 
   // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+  // synced testing
+  // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+  isSynced() {
+    var {opChannel, metaChannel} = this.state.connection;
+    return this.buffer.length === 0
+        && (!opChannel || opChannel.isEmpty())
+        && (!metaChannel || metaChannel.isEmpty());
+  }
+
+  synced() {
+    return promise.waitFor(() =>
+      this.isSynced()).then(() => this);
+  }
+
+  // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
   // processing changes from local world, creating new op
   // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
@@ -508,6 +534,7 @@ export class Client {
     var parent = arr.last(this.buffer) || arr.last(this.history);
     return this.newOperation({
       parent: parent ? parent.id : null,
+      version: parent ? parent.version + 1 : 0,
       id: string.newUUID(),
       creator: this.state.name,
       change: serializeChange(change, this.state.objects),
@@ -535,6 +562,7 @@ export class Client {
     var {buffer,pending} = this.state;
     if (pending.length || !buffer.length) return Promise.resolve();
     this.state.pending.push(buffer[0]);
+
     return this.send(buffer[0]);
   }
 
@@ -546,7 +574,8 @@ export class Client {
       var lastOp = arr.last(this.history),
           answer = await this.sendMetaAndWait({
             request: "history-since-or-snapshot",
-            since: lastOp ? lastOp.id : null
+            // since: lastOp ? lastOp.id : null
+            since: lastOp ? lastOp.version : 0
           });
 
       if (answer.type === "history") {
@@ -602,27 +631,32 @@ export class Client {
 
   receiveOpsFromMaster(ops) {
 
-    var {pending, history, buffer} = this.state;
     for (let op of ops) {
 
-      if (pending.length && op.id === pending[0].id) {
+      if (this.state.pending.length && op.id === this.state.pending[0].id) {
         // it is a ack, i.e. that the operation or an equivalent (having the
         // same id) was send by this client. We received it b/c the server
         // applied it and broadcasted it subsequently. For this client this
         // means we can remove the op from pending
-        pending.shift();
-        var ackIndex = buffer.findIndex(ea => ea.id === op.id)+1;
-        var opsTilAck = buffer.slice(0, ackIndex);
-        this.state.buffer = buffer.slice(ackIndex);
-        this.state.history = history.concat(opsTilAck);
+        this.state.pending.shift();
+        var ackIndex = this.state.buffer.findIndex(ea => ea.id === op.id)+1;
+        var opsTilAck = this.state.buffer.slice(0, ackIndex);
+        this.state.buffer = this.state.buffer.slice(ackIndex);
+        this.state.history = this.state.history.concat(opsTilAck);
+        // console.log(`${this} got ACK ${op}, pending ${pending}`)
 
+      } else if (this.state.history.some(pastOp => pastOp.id === op.id)) {
+        console.warn(`${this}: op ${op} already received!`);
       } else {
+
         // we got a new op from the server, transform it via the bridge /
         // buffer and apply it locally.
-        var {transformedOp, transformedAgainstOps} = this.transform(op, buffer);
+        var {transformedOp, transformedAgainstOps} = this.transform(op, this.state.buffer);
+        // console.log(`${this} got ${op} => ${transformedOp}`)
         this.state.buffer = transformedAgainstOps;
-        history.push(transformedOp);
+        this.state.history.push(transformedOp);
         this.apply(transformedOp);
+
       }
     }
 
@@ -872,11 +906,15 @@ export class Master {
   receiveOpsFromClient(ops, client, connection) {
     // ops to be expected to contigous operations, i.e. ops[n].id === ops[n+1].parent
     if (!ops.length) return;
+
     var opsForTransform = this.findOpsForTransform(ops[0]),
         transformed = ops.map(op => this.transform(op, opsForTransform).transformedOp);
-    this.state.history = this.state.history.concat(transformed);
-    transformed.forEach(op => this.apply(op));
-    this.broadcast(ops, client);
+
+    transformed.forEach(op => {
+      this.state.history.push(op);
+      this.apply(op);
+    });
+    this.broadcast(transformed, client);
   }
 
   broadcast(ops, sender) {
@@ -900,13 +938,14 @@ export class Master {
     // childOp is expected to be an operation that is directly based on an
     // operation of the servers history; find operations that were added since
     // childOp's parent and transform childOp against them
-    return this.historySince(childOp.parent);
+    // return this.historySince(childOp.parent);
+    return this.historySince(childOp.version);
   }
 
-  historySince(opId) {
+  historySince(requiredVersion) {
     return arr.takeWhile(
           this.state.history.slice().reverse(),
-          (ea) => ea.id !== opId).reverse();
+          (ea) => ea.version >= requiredVersion).reverse();
   }
 
   apply(op) {
