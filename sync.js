@@ -146,7 +146,7 @@ function printChange(change) {
 }
 
 function printOp(op) {
-  var {id, parent, components: [change]} = op;
+  var {id, parent, change} = op;
   return `${printUUID(id)} < ${printUUID(parent)} | ${printChange(change)}`
 }
 
@@ -214,15 +214,10 @@ function composeOps(ops) {
 }
 
 function composeOpPair(op1, op2) {
-  // FIXME we currently assume 1 component per op
-  if (op1.components.length != 1 || op2.components.length != 1) return [op1, op2];
-  
-  var [change1] = op1.components, [change2] = op2.components;
-  
   // composing setters: Use the last change as it overrides everything before
-  if (change1.prop === change2.prop
-   && isEqualRef(change1.target, change2.target)
-   && change1.type === "setter" && change2.type === "setter")
+  if (op1.change.prop === op2.change.prop
+   && isEqualRef(op1.change.target, op2.change.target)
+   && op1.change.type === "setter" && op2.change.type === "setter")
      return [op2]
 
   return [op1, op2];
@@ -405,8 +400,10 @@ export class Client {
 
     var parent = arr.last(this.buffer) || arr.last(this.history);
     return this.newOperation({
-      parent: parent ? parent.id : null, id: string.newUUID(),
-      components: [serializeChange(change, this.state.objects)],
+      parent: parent ? parent.id : null,
+      id: string.newUUID(),
+      creator: this.state.name,
+      change: serializeChange(change, this.state.objects),
       toString: function() { return printOp(this); }
     });
   }
@@ -486,7 +483,7 @@ return console.error(`Not yet implemented`);
     // applying received operations
     this.state.isApplyingChange = true;
     try {
-      op.components.forEach(change => applyChange(change, this));
+      applyChange(op.change, this)
     } catch (e) {
       console.log(`sync client apply error: ${e}`);
       this.state.error = e;
@@ -621,10 +618,9 @@ export class Master {
   }
 
   apply(op) {
-// show(`APPLY: ${op.id} ${obj.inspect(op.components[0], {maxDepth: 2})}`)
-
+    // ...to local state
     try {
-      op.components.forEach(change => applyChange(change, this));
+      applyChange(op.change, this)
     } catch (e) {
       console.log(`sync master apply error: ${e}`);
       this.state.error = e;

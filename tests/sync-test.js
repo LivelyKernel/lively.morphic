@@ -106,9 +106,9 @@ describe("syncing master with two clients", function() {
       receiver: {type: "lively-sync-morph-ref", id: world1.id},
       args: [{type: "lively-sync-morph-spec", spec: {name: "m1", position: pt(10,10), extent: pt(50,50)}}]
     }
-    expect(client1.history[0].components).containSubset([expectedChange]);
+    expect(client1.history[0].change).containSubset(expectedChange);
     expect(client2.history).to.have.length(1);
-    expect(master.history[0].components).containSubset([expectedChange]);
+    expect(master.history[0].change).containSubset(expectedChange);
     expect(master.history).to.have.length(1);
 
     // are there different morphs in each world?
@@ -131,11 +131,10 @@ describe("syncing master with two clients", function() {
     var m = world1.addMorph({position: pt(10,10), extent: pt(50,50), fill: Color.red});
     m.moveBy(pt(1,1)); m.moveBy(pt(1,1)); m.moveBy(pt(2,2));
     await client1.synced();
-    console.log("???")
     expect(client1.history).to.have.length(2);
     expect(master.history).to.have.length(2);
-    expect(master.history[0]).to.containSubset({components: [{type: "method-call", selector: "addMorph"}]})
-    expect(master.history[1]).to.containSubset({components: [{type: "setter", prop: "position", value: pt(14,14)}]})
+    expect(master.history[0]).to.containSubset({change: {type: "method-call", selector: "addMorph"}});
+    expect(master.history[1]).to.containSubset({change: {type: "setter", prop: "position", value: pt(14,14)}});
   });
 
   it("sync image", async () => {
