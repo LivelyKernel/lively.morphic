@@ -77,6 +77,9 @@ function serializeChange(change, objectMap) {
   if (change.target)
     serializedChange.target = serializeChangeProp(change, "target", change.target, objectMap, {forceMorphId: true});
 
+  if (change.owner)
+    serializedChange.owner = serializeChangeProp(change, "owner", change.owner, objectMap, {forceMorphId: true});
+
   if (change.type === "setter") {
     serializedChange.value = serializeChangeProp(change, "value", change.value, objectMap);
   } else if (change.type === "method-call") {
@@ -165,6 +168,15 @@ function nullTransform(op1, op2) {
   return {op1, op2, handled: false};
 }
 
+function morphicDefaultTransform(op1, op2, syncer) {
+  var c1 = op1.change, c2 = op2.change;
+  if (c1.prop === "position" && c2.prop === "position"
+   && c1.type === "setter" && c2.type === "setter"
+   && c1.target.id === c2.target.id
+   && c1.owner.id === c2.owner.id
+   && !c1.target.id.match(/Hand/i)) {
+     op1.change = op2.change = Object.assign({}, op1.change, {
+       value: c1.value.addPt(c2.value.subPt(c1.value).scaleBy(.5))})
 
 function runTransforms(op1, op2, tfmFns) {
   op1 = obj.clone(op1),
