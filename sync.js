@@ -245,8 +245,15 @@ class Channel {
     this.queueBtoA = [];
     this.delayAtoB = 0;
     this.delayBtoA = 0;
-    this.lifetime = 5;
-    this.debug = false;
+    this.online = false;
+    this.debug = true;
+    this.lifetime = 100;
+
+    this.goOnline();
+  }
+
+  toString() {
+    return `<channel ${this.senderRecvrA}.${this.onReceivedMethodA} – ${this.senderRecvrB}.${this.onReceivedMethodB}>`
   }
 
   isOnline() { return this.online; }
@@ -287,7 +294,8 @@ class Channel {
       var msgs = (Array.isArray(content) ? content : [content]);
       let string = `${sender} -> ${recvr}:`;
       if (!msgs.length) string += " no messages"
-      else if (msgs.length === 1) string += msgs[0];
+      // else if (msgs.length === 1) string += msgs[0];
+      else if (msgs.length === 1) string += i(msgs[0]);
       else string += "\n  " + msgs.join("\n  ");
       console.log(string);
     }
@@ -298,6 +306,7 @@ class Channel {
 
     // try again later...
     if (!this.isOnline()) return;
+
 
     return Promise.resolve().then(() =>
       new Promise((resolve, reject) => {
@@ -335,6 +344,7 @@ class Channel {
 export class ClientState {
 
   constructor(world) {
+    this.name = "some client"
     this.error = null;
     this.world = world;
     this.objects = new Map();
@@ -343,7 +353,8 @@ export class ClientState {
     this.pending = [];
     this.buffer = [];
     this.isApplyingChange = false;
-    this.enabled = true;
+    this.connection = {opChannel: null, metaChannel: null};
+    this.metaMessageCallbacks = {};
     this.transformFunctions = [];
     this.delay = 0;
   }
@@ -352,9 +363,9 @@ export class ClientState {
 
 export class Client {
 
-  constructor(world, name) {
+  constructor(world, name = "some client") {
     this.state = new ClientState(world);
-    this.state.name = name || "some client"
+    this.state.name = name;
   }
 
   toString() {
@@ -363,41 +374,108 @@ export class Client {
 
   get error() { return this.state.error }
 
-  get enabled() { return this.state.enabled; }
-  set enabled(bool) { this.state.enabled = bool; if (bool) this.syncWithMaster(); }
-
   get history() { return this.state.history; }
   get buffer() { return this.state.buffer; }
   printHist() { return printOps(this.history); }
   printBuffer() { return printOps(this.buffer); }
 
   get master() {
-    return this.state.connection ?
-      this.state.connection.senderRecvrB : null;
+    var opChannel = this.state.connection.opChannel;
+    return opChannel ? opChannel.senderRecvrB : null;
   }
 
   send(op) {
     if (!this.hasConnection())
       throw new Error(`Cannot send, not connected!`)
-    this.state.connection.send(op, this);
+    return this.state.connection.opChannel.send(op, this);
+  }
+
+  sendMeta(msg) {
+    if (!this.hasConnection())
+      throw new Error(`Cannot send, not connected!`)
+    return this.state.connection.metaChannel.send(msg, this);
+  }
+
+  sendMetaAndWait(msg) {
+    return new Promise((resolve, reject) => {
+      if (!this.hasConnection())
+        return reject(new Error(`Cannot send, not connected!`));
+      msg.id = msg.id || string.newUUID();
+      this.state.metaMessageCallbacks[msg.id] =
+        answer => answer.error ? reject(new Error(answer.error)) : resolve(answer);
+      this.sendMeta(msg);
+    });
   }
 
   disconnectFromMaster() {
-    var s = this.state;
-    if (!s.connection) return;
-    var master = s.connection.senderRecvrB;
-    master.removeConnection(s.connection);
-    s.connection = null;
+    var con = this.state.connection, {opChannel, metaChannel} = con;
+    if (!opChannel && !metaChannel) return;
+    opChannel && opChannel.goOffline();
+    metaChannel && metaChannel.goOffline();
+    var master = (opChannel || metaChannel).senderRecvrB;
+    master.removeConnection(con);
+    con.metaChannel = null;
+    con.opChannel = null;
   }
 
   connectToMaster(master) {
     this.disconnectFromMaster();
-    this.state.connection = new Channel(this, "receiveOpsFromMaster", master, "receiveOpsFromClient")
-    master.addConnection(this.state.connection);
+    var con = this.state.connection;
+    con.opChannel = new Channel(this, "receiveOpsFromMaster", master, "receiveOpsFromClient")
+    con.metaChannel = new Channel(this, "receiveMetaMsgsFromMaster", master, "receiveMetaMsgsFromClient")
+    master.addConnection(con);
   }
 
-  hasConnection() { return !!this.state.connection; }
-  isOnline() { return this.hasConnection() && this.state.connection.isOnline(); }
+  hasConnection() {
+    var {opChannel, metaChannel} = this.state.connection;
+    return !!opChannel && !!metaChannel;
+  }
+
+  isOnline() {
+    var {opChannel, metaChannel} = this.state.connection;
+    return this.hasConnection() && opChannel.isOnline() && metaChannel.isOnline();
+  }
+
+  goOffline() {
+    var {opChannel, metaChannel} = this.state.connection;
+    opChannel.goOffline();
+    metaChannel.goOffline();
+  }
+
+  goOnline() {
+    var {opChannel, metaChannel} = this.state.connection;
+    opChannel.goOnline();
+    metaChannel.goOnline();
+  }
+
+  goOfflineWithOpChannel() {
+    var {opChannel} = this.state.connection;
+    opChannel.goOffline();
+  }
+
+  goOnlineWithOpChannel() {
+    var {opChannel} = this.state.connection;
+    opChannel.goOnline();
+  }
+
+  // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+  // "locking" – meta operation sent to everyone to prevent
+  // changes while some other operation happens
+  // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+  lockEveryone() {
+    return this.sendMetaAndWait({
+      request: "lock",
+      requester: this.state.name
+    });
+  }
+
+  unlockEveryone() {
+    return this.sendMetaAndWait({
+      request: "unlock",
+      requester: this.state.name
+    });
+  }
 
   // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
   // processing changes from local world, creating new op
@@ -439,29 +517,66 @@ export class Client {
     }
 
     var {buffer,pending} = this.state;
-    if (!this.enabled || pending.length || !buffer.length) return Promise.resolve();
+    if (pending.length || !buffer.length) return Promise.resolve();
     this.state.pending.push(buffer[0]);
     return this.send(buffer[0]);
   }
 
-  syncWithMaster() {
+  async syncWithMaster() {
     // this.state.pending = [];
     // this.state.buffer = [];
 
-return console.error(`Not yet implemented`);
+    try {
+      var lastOp = arr.last(this.history),
+          answer = await this.sendMetaAndWait({
+            request: "history-since-or-snapshot",
+            since: lastOp ? lastOp.id : null
+          });
 
-    this.state.isApplyingChange = false;
-    this.state.error = false
-    var lastOp = arr.last(this.history),
-        hist = this.master.historySince(lastOp ? lastOp.id : null);
-    this.receive(hist);
+      if (answer.type === "history") {
+        return this.receiveOpsFromMaster(answer.history);
+      }
+
+      if (answer.type === "snapshot") {
+        throw new Error(`${this}: syncing from snapshot not yet implemented`);
+      }
+
+    } catch (e) {
+      this.state.error = e;
+      console.error(`Cannot sync ${this} with master: ${e}`);
+      return Promise.reject(e);
+    }
   }
 
-  receiveOpsFromMaster(ops, master, connection) {
+  receiveMetaMsgsFromMaster(msgs, master, metaChannel) {
+    for (let msg of msgs) {
+      try {
 
-    if (!this.enabled) return;
+        if (msg.inResponseTo) {
+          var cb = this.state.metaMessageCallbacks[msg.inResponseTo];
+          if (typeof cb === "function") return cb(msg);
+  
+        } else if (msg.request === "lock" || msg.request === "unlock") {
+          var lock = msg.request === "lock"
+          if (lock) this.goOfflineWithOpChannel();
+          else this.goOnlineWithOpChannel();
+          var answer = {
+            inResponseTo: msg.id,
+            type: "lock-result",
+            locked: lock
+          };
+          return metaChannel.send(answer, this);
+        }
+      } catch (e) {
+        console.error(`${this}: Error when processing message: ${i(msg)}: ${e}`)
+      }
 
-// if (client1 === this) debugger;
+      console.error(`${this} got meta message but don't know what do to with it! ${i(msg)}}`)
+    }
+  }
+
+  receiveOpsFromMaster(ops) {
+
     var {pending, history, buffer} = this.state;
     for (let op of ops) {
 
@@ -514,7 +629,12 @@ return console.error(`Not yet implemented`);
   // synced testing
   // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-  isSynced() { return this.buffer.length === 0 }
+  isSynced() {
+    var {opChannel, metaChannel} = this.state.connection;
+    return this.buffer.length === 0
+        && (!opChannel || opChannel.isEmpty())
+        && (!metaChannel || metaChannel.isEmpty());
+  }
 
   synced() {
     return promise.waitFor(() =>
@@ -558,7 +678,9 @@ export class MasterState {
     world.withAllSubmorphsDo(ea => this.objects.set(ea.id, ea));
     this.history = [];
     this.connections = [];
-    this.enabled = true;
+    this.locked = false;
+    this.transformFunctions = [];
+    this.metaMessageCallbacks = {};
   }
 
 }
@@ -587,10 +709,98 @@ export class Master {
   addConnection(c) { return arr.pushIfNotIncluded(this.state.connections, c); }
   removeConnection(c) { return arr.remove(this.state.connections, c); }
   get connections() { return this.state.connections; }
-  connectionFor(client) { return this.connections.find(c => c.senderRecvrA === client); }
+  connectionFor(client) { return this.connections.find(c => c.opChannel && c.opChannel.senderRecvrA === client); }
+
+  // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+  // meta communication
+  // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+  sendMeta(connection, msg) {
+    if (!connection || !connection.metaChannel)
+      throw new Error(`${this}: No (meta) connection when sending meta message ${i(msg)}`);
+    return connection.metaChannel.send(msg, this);
+  }
+
+  sendMetaAndWait(connection, msg) {
+    return new Promise((resolve, reject) => {
+      msg.id = msg.id || string.newUUID();
+      this.state.metaMessageCallbacks[msg.id] = answer =>
+        answer.error ? reject(new Error(answer.error)) : resolve(answer);
+      this.sendMeta(connection, msg);
+    });
+  }
+
+  receiveMetaMsgsFromClient(msgs, client, metaChannel) {
+    for (let msg of msgs) {
+
+      if (msg.inResponseTo) {
+        var cb = this.state.metaMessageCallbacks[msg.inResponseTo];
+        if (typeof cb === "function") cb(msg);
+        return;
+      }
+
+      switch (msg.request) {
+        case "history-since-or-snapshot":
+          this.answerHistorySinceOrSnapshotMessage(msg, metaChannel);
+          break;
+
+        case "lock": case "unlock":
+          this.answerLockAndUnlockRequest(msg, metaChannel);
+          break;
+          
+        default:
+          console.error(`master received meta message ${i(msg)} but don't know what to do with it!`);
+      }
+    }
+  }
+
+  answerHistorySinceOrSnapshotMessage(msg, metaChannel) {
+    var answer = {
+      inResponseTo: msg.id,
+      type: "history",
+      history: this.historySince(msg.since)
+    };
+    metaChannel.send(answer, this);
+  }
+
+  async answerLockAndUnlockRequest(msg, metaChannel) {
+    var err, lock = msg.request === "lock";
+
+    console.log("lock" ? "locking..." : "unlocking");
+
+    // only one lock at a time
+    if (lock && this.state.locked) {
+      var answer = {
+        inResponseTo: msg.id,
+        type: msg.request + "-result",
+        error: "Already locked"
+      };
+      metaChannel.send(answer, this);
+      return;
+    }
+
+    if (lock) this.state.locked = true;
+
+    // forward to all clients...
+    try {
+      await Promise.all(this.connections.map(c =>
+          this.sendMetaAndWait(c, Object.assign({}, msg, {id: null}))))
+    } catch (e) {
+      err = e;
+      console.error(`Error locking / unlocking all clients in master: ${err}`);
+    }
+
+    var answer = {inResponseTo: msg.id, type: msg.request + "-result", error: err ? String(err.stack || err) : null, locked: lock};
+    metaChannel.send(answer, this);
+
+    if (!lock) this.state.locked = false;
+  }
+
+  // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+  // operation-related communication
+  // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
   receiveOpsFromClient(ops, client, connection) {
-
     // ops to be expected to contigous operations, i.e. ops[n].id === ops[n+1].parent
     if (!ops.length) return;
     var opsForTransform = this.findOpsForTransform(ops[0]),
@@ -609,8 +819,8 @@ export class Master {
     var sourceCon = this.connectionFor(sender),
         priorityCons = arr.without(this.connections, sourceCon);
 
-    priorityCons.forEach(ea => ea.send(ops, this));
-    if (sourceCon) sourceCon.send(ops, this);
+    priorityCons.forEach(ea => ea.opChannel.send(ops, this));
+    if (sourceCon) sourceCon.opChannel.send(ops, this);
   }
 
   // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -646,28 +856,3 @@ export class Master {
   transform(op, againstOps) { return transformOp_1_to_n(op, againstOps, this.state.transformFunctions); }
 
 }
-    this.goOnline();
-    this.goOnline();
-  }
-  goOffline() {
-    var {opChannel, metaChannel} = this.state.connection;
-    opChannel.goOffline();
-    metaChannel.goOffline();
-  }
-
-  goOnline() {
-    var {opChannel, metaChannel} = this.state.connection;
-    opChannel.goOnline();
-    metaChannel.goOnline();
-  }
-
-  hasConnection() {
-    var {opChannel, metaChannel} = this.state.connection;
-    return !!opChannel && !!metaChannel;
-  }
-
-  isOnline() {
-    var {opChannel, metaChannel} = this.state.connection;
-    return this.hasConnection() && opChannel.isOnline() && metaChannel.isOnline();
-  }
-

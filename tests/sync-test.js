@@ -16,7 +16,7 @@ async function setup(nClients) {
   if (!state) state = {};
   if (state.running) teardown();
 
-  var masterEnv = state.masterEnv = await buildTestWorld({type: "world", name: "world", extent: pt(300,0)}, pt(0,0)),
+  var masterEnv = state.masterEnv = await buildTestWorld({type: "world", name: "world", extent: pt(300,300)}, pt(0,0)),
       master = state.master = new Master(masterEnv.world);
   state.masterWorld = masterEnv.world;
 
@@ -46,6 +46,7 @@ function teardown() {
       } catch (e) { console.error(e); }
     } else if (name.match(/^client/)) {
       var client = s[name];
+      client.disconnectFromMaster();
       client.receive = function() {};
     }
   });
@@ -91,7 +92,7 @@ describe("syncing master with two clients", function() {
     // is morph state completely synced?
     expect(masterWorld.exportToJSON()).deep.equals(world1.exportToJSON(), "masterWorld");
     expect(world2.exportToJSON()).deep.equals(world1.exportToJSON(), "world2");
-    
+
     // has morph an owner?
     expect(masterWorld.get("m1").owner).equals(masterWorld);
     expect(world2.get("m1").owner).equals(world2);
@@ -144,4 +145,104 @@ describe("syncing master with two clients", function() {
     // make sure it is rendered correctly
     expect(env2.renderer.getNodeForMorph(env2.world.submorphs[0])).property("tagName", "IMG");
   });
+
+  it("take client offline then online", async () => {
+    var {world1, world2, masterWorld, client1, client2} = state;
+    world1.fill = Color.white;
+    await client1.synced();
+    expect(masterWorld.fill).equals(Color.white);
+
+    client1.goOffline();
+    world2.fill = Color.green;
+    await client2.synced();
+    expect(masterWorld.fill).equals(Color.green);
+    expect(world1.fill).equals(Color.white);
+
+    client1.goOnline();
+    await client1.synced();
+    expect(world1.fill).equals(Color.green);
+  });
+
+  it("re-connect client", async () => {
+    var {world1, world2, masterWorld, client1, client2, master} = state;
+    world1.fill = Color.yellow;
+    await client1.synced();
+    expect(masterWorld.fill).equals(Color.yellow);
+
+    client1.disconnectFromMaster();
+    world2.fill = Color.green;
+    await client2.synced();
+    expect(masterWorld.fill).equals(Color.green);
+    expect(world1.fill).equals(Color.yellow);
+
+    client1.connectToMaster(master);
+    await client1.syncWithMaster();
+    expect(world1.fill).equals(Color.green);
+  });
+
+  describe("locking", () => {
+
+    it("all participants by one client", async () => {
+      var {world1, world2, masterWorld, client1, client2, master} = state;
+      world1.fill = Color.green;
+      await client1.synced();
+
+      await client1.lockEveryone();
+      world2.fill = Color.red;
+      await promise.delay(10)
+      expect(world1.fill).equals(Color.green, "client1 after lock");
+      expect(masterWorld.fill).equals(Color.green, "master after lock");
+
+      await client1.unlockEveryone();
+      await client2.synced();
+
+      expect(masterWorld.fill).equals(Color.red);
+      expect(world1.fill).equals(Color.red);
+    });
+
+    it("twice", async () => {
+      var {world1, world2, masterWorld, client1, client2, master} = state;
+      await client1.lockEveryone();
+      try {
+        await client2.lockEveryone();
+      } catch (e) {
+        expect(e).match(/already locked/i)
+        return;
+      }
+      expect.fail(undefined, undefined, "No error on second lock");
+    });
+
+
+  });
+
+  it("simple conflicting prop change is transformed", async () => {
+    var {world1, world2, masterWorld, client1, client2, master} = state;
+
+var tfm = (op1In, op2In) => {
+  var op1 = lively.lang.obj.clone(op1In),
+      op2 = lively.lang.obj.clone(op2In);
+  var v1 = op1.change.value, v2 = op2.change.value;
+  var resolvedValue = op1.creator < op2.creator ? v1 : v2
+  op1.change.value = resolvedValue;
+  op2.change.value = resolvedValue;
+  return {op1, op2}
+}
+client1.changeTransform(tfm)
+client2.changeTransform(tfm)
+master.changeTransform(tfm)
+
+    world1.fill = Color.green;
+    world2.fill = Color.blue;
+    await client1.synced() && client2.synced();
+
+    expect(masterWorld.fill).equals(Color.green, "master");
+    expect(world1.fill).equals(Color.green, "client1");
+    expect(world2.fill).equals(Color.green, "client2");
+  });
+
+
+});
+
+describe("transforms", () => {
+
 });
