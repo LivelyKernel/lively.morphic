@@ -1,4 +1,4 @@
-import { arr, string, obj, promise, fun } from "lively.lang";
+import { num, arr, string, obj, promise, fun } from "lively.lang";
 import { morph } from "./index.js";
 
 var i = val => obj.inspect(val, {maxDepth: 2}),
@@ -160,26 +160,41 @@ function printOps(ops) { return ops.map(printOp).join("\n"); }
 // transforming ops
 // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-function transformOp_1_to_n(op, againstOps) {
+function nullTransform(op1, op2) {
+  // does nothing
+  return {op1, op2, handled: false};
+}
+
+
+function runTransforms(op1, op2, tfmFns) {
+  op1 = obj.clone(op1),
+  op2 = obj.clone(op2);
+
+  for (let tfmFn of tfmFns) {
+    try {
+      var {op1, op2, handled} = tfmFn(op1, op2);
+      if (handled) break;
+    } catch (e) {
+      console.error(`Error while transforming ${op1} with ${op2}:\n ${e.stack || e}`);
+    }
+  }
+
+  op1.parent = op2.id;
+  op2.parent = op1.id;
+  return {op1, op2};
+}
+
+function transformOp_1_to_n(op, againstOps, transformFns = []) {
   // transform an op against other ops
   if (!againstOps.length)
     return {transformedOp: op, transformedAgainstOps: []}
 
-  var transformedOp = op, transformedAgainstOps = [];
+  var op2 = op, transformedAgainstOps = [];
   for (let op1 of againstOps) {
-    var {tfmd1, tfmd2} = tfmPair(op1, transformedOp);
-    transformedAgainstOps.push(tfmd1);
-    transformedOp = tfmd2;
+    var {op1, op2} = runTransforms(op1, op2, transformFns);
+    transformedAgainstOps.push(op1);
   }
-  return {transformedOp, transformedAgainstOps: againstOps}
-
-  function tfmPair(op1, op2) {
-    var tfmd1 = obj.clone(op1), tfmd2 = obj.clone(op2);
-    tfmd1.parent = op2.id;
-    tfmd2.parent = op1.id;;
-    return {tfmd1, tfmd2};
-  }
-
+  return {transformedOp: op2, transformedAgainstOps: againstOps}
 }
 
 
@@ -321,6 +336,7 @@ export class ClientState {
     this.buffer = [];
     this.isApplyingChange = false;
     this.enabled = true;
+    this.transformFunctions = [];
     this.delay = 0;
   }
 
@@ -481,7 +497,8 @@ return console.error(`Not yet implemented`);
 
   }
 
-  transform(op, againstOps) { return transformOp_1_to_n(op, againstOps); }
+  changeTransform(tfmFn) { this.state.transformFunctions = [tfmFn]; }
+  transform(op, againstOps) { return transformOp_1_to_n(op, againstOps, this.state.transformFunctions); }
 
   // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
   // synced testing
@@ -616,6 +633,7 @@ export class Master {
 
   }
 
-  transform(op, againstOps) { return transformOp_1_to_n(op, againstOps); }
+  changeTransform(tfmFn) { this.state.transformFunctions = [tfmFn]; }
+  transform(op, againstOps) { return transformOp_1_to_n(op, againstOps, this.state.transformFunctions); }
 
 }
