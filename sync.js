@@ -118,6 +118,10 @@ function isEqualRef(objA, objB) {
   return false;
 }
 
+function fnStringsToFunctions(fnStrings) {
+  return fnStrings.map(ea => eval(`(${ea})`));
+}
+
 // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 // debugging helpers
@@ -567,18 +571,27 @@ export class Client {
         if (msg.inResponseTo) {
           var cb = this.state.metaMessageCallbacks[msg.inResponseTo];
           if (typeof cb === "function") return cb(msg);
-  
+
         } else if (msg.request === "lock" || msg.request === "unlock") {
           var lock = msg.request === "lock"
           if (lock) this.goOfflineWithOpChannel();
           else this.goOnlineWithOpChannel();
-          var answer = {
-            inResponseTo: msg.id,
-            type: "lock-result",
-            locked: lock
-          };
+          var answer = {inResponseTo: msg.id, type: "lock-result", locked: lock};
           return metaChannel.send(answer, this);
+
+        } else if (msg.request === "change-transforms") {
+          try {
+            this.state.transformFunctions = fnStringsToFunctions(msg.transformFunctions);
+            var answer = {inResponseTo: msg.id, type: "change-transforms-result", status: "OK"};
+            metaChannel.send(answer, this);
+          } catch (e) {
+            console.error(`error in change-transforms handler: ${e}`)
+            var answer = {inResponseTo: msg.id, error: `error in change-transforms handler: ${e}`};
+            metaChannel.send(answer, this);
+          }
+          return;
         }
+
       } catch (e) {
         console.error(`${this}: Error when processing message: ${i(msg)}: ${e}`)
       }
@@ -634,23 +647,40 @@ export class Client {
 
   }
 
-  changeTransform(tfmFn) { this.state.transformFunctions = [tfmFn]; }
-  transform(op, againstOps) { return transformOp_1_to_n(op, againstOps, this.state.transformFunctions); }
-
   // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-  // synced testing
+  // transform functions
   // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-  isSynced() {
-    var {opChannel, metaChannel} = this.state.connection;
-    return this.buffer.length === 0
-        && (!opChannel || opChannel.isEmpty())
-        && (!metaChannel || metaChannel.isEmpty());
+  getTransforms() { this.state.transformFunctions; }
+  setTransforms(tfms) {
+    this.state.transformFunctions = tfms;
+    return this.syncTransforms();
   }
 
-  synced() {
-    return promise.waitFor(() =>
-      this.isSynced()).then(() => this);
+  addTransform(tfmFn) {
+    arr.pushIfNotIncluded(this.state.transformFunctions, tfmFn);
+    return this.syncTransforms();
+  }
+  removeTransform(tfmFn) {
+    arr.remove(this.state.transformFunctions, tfmFn);
+    return this.syncTransforms();
+  }
+
+  async syncTransforms() {
+    await this.lockEveryone();
+    try {
+      await this.sendMetaAndWait({
+        request: "change-transforms",
+        requester: this.state.name,
+        transformFunctions:this.state.transformFunctions.map(String)
+      });
+    } finally {
+      await this.unlockEveryone();
+    }
+  }
+
+  transform(op, againstOps) {
+    return transformOp_1_to_n(op, againstOps, this.state.transformFunctions, this);
   }
 
   // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -691,7 +721,7 @@ export class MasterState {
     this.history = [];
     this.connections = [];
     this.locked = false;
-    this.transformFunctions = [];
+    this.transformFunctions = [morphicDefaultTransform];
     this.metaMessageCallbacks = {};
   }
 
@@ -753,20 +783,24 @@ export class Master {
 
       switch (msg.request) {
         case "history-since-or-snapshot":
-          this.answerHistorySinceOrSnapshotMessage(msg, metaChannel);
+          this.handleHistorySinceOrSnapshotMessage(msg, metaChannel);
           break;
 
         case "lock": case "unlock":
-          this.answerLockAndUnlockRequest(msg, metaChannel);
+          this.handleLockAndUnlockRequest(msg, metaChannel);
           break;
-          
+
+        case "change-transforms":
+          this.handleChangeTransformRequest(msg, metaChannel);
+          break;
+
         default:
           console.error(`master received meta message ${i(msg)} but don't know what to do with it!`);
       }
     }
   }
 
-  answerHistorySinceOrSnapshotMessage(msg, metaChannel) {
+  handleHistorySinceOrSnapshotMessage(msg, metaChannel) {
     var answer = {
       inResponseTo: msg.id,
       type: "history",
@@ -775,7 +809,7 @@ export class Master {
     metaChannel.send(answer, this);
   }
 
-  async answerLockAndUnlockRequest(msg, metaChannel) {
+  async handleLockAndUnlockRequest(msg, metaChannel) {
     var err, lock = msg.request === "lock";
 
     console.log("lock" ? "locking..." : "unlocking");
@@ -806,6 +840,29 @@ export class Master {
     metaChannel.send(answer, this);
 
     if (!lock) this.state.locked = false;
+  }
+
+  async handleChangeTransformRequest(msg, metaChannel) {
+    var err;
+    if (!this.state.locked) {
+      err = "system is not locked, changing transforms is not safe";
+    } else {
+      // changin in master + forward to all clients...
+      try {
+        this.state.transformFunctions = fnStringsToFunctions(msg.transformFunctions);
+        await Promise.all(this.connections.map(c =>
+            this.sendMetaAndWait(c, Object.assign({}, msg, {id: null}))))
+      } catch (e) { err = e; }
+    }
+
+    var answer;
+    if (err) {
+      console.error(`error in change-transforms handler: ${e}`)
+      answer = {inResponseTo: msg.id, error: `error in change-transforms handler: ${e}`};
+    } else {
+      answer = {inResponseTo: msg.id, type: "change-transforms-result", status: "OK"};
+    }
+    return metaChannel.send(answer, this);
   }
 
   // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -864,7 +921,11 @@ export class Master {
 
   }
 
-  changeTransform(tfmFn) { this.state.transformFunctions = [tfmFn]; }
-  transform(op, againstOps) { return transformOp_1_to_n(op, againstOps, this.state.transformFunctions); }
+  // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+  // transform fn related
+  // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+  transform(op, againstOps) {
+    return transformOp_1_to_n(op, againstOps, this.state.transformFunctions, this);
+  }
 
 }
