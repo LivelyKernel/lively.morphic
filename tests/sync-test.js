@@ -227,41 +227,66 @@ describe("syncing master with two clients", function() {
 
   });
 
-  it("simple conflicting prop change is transformed", async () => {
 
-    // setup(2)
-    // teardown();
+  describe("transforms", () => {
 
-    var {world1, world2, masterWorld, client1, client2, master} = state;
 
-var tfm = (op1, op2) => {
-  var v1 = op1.change.value,
-      v2 = op2.change.value,
-      // resolvedValue = v1.mixedWith(v2, 0.5)
-      resolvedValue = op1.creator < op2.creator ? v1 : v2
-  op1.change.value = resolvedValue;
-  op2.change.value = resolvedValue;
-  return {op1, op2}
-}
+    it("set transform and resolve simpoe conflict", async () => {
 
-// await client1.addTransform(tfm)
+      // setup(2)
+      // teardown();
 
-client1.state.transformFunctions = [tfm];
-client2.state.transformFunctions = [tfm];
-master.state.transformFunctions =  [tfm];
+      var {world1, world2, masterWorld, client1, client2, master} = state;
 
-    world1.fill = Color.green;
-    world2.fill = Color.blue;
-    await client1.synced() && client2.synced();
+      var tfm = (op1, op2) => {
+        var v1 = op1.change.value,
+            v2 = op2.change.value,
+            resolvedValue = op1.creator < op2.creator ? v1 : v2
+        op1.change.value = resolvedValue;
+        op2.change.value = resolvedValue;
+        return {op1, op2}
+      }
 
-    expect(masterWorld.fill).equals(Color.green, "master");
-    expect(world1.fill).equals(Color.green, "client1");
-    expect(world2.fill).equals(Color.green, "client2");
+      await client1.setTransforms([tfm])
+
+      // client1.state.transformFunctions = [tfm];
+      // client2.state.transformFunctions = [tfm];
+      // master.state.transformFunctions =  [tfm];
+
+      world1.fill = Color.green;
+      world2.fill = Color.blue;
+      await client1.synced() && client2.synced();
+
+      expect(masterWorld.fill).equals(Color.green, "master");
+      expect(world1.fill).equals(Color.green, "client1");
+      expect(world2.fill).equals(Color.green, "client2");
+    });
+
+    it("resolves morph position conflict", async () => {
+      var {world1, world2, masterWorld, client1, client2, master} = state;
+      var m = world1.addMorph({name: "m1", position: pt(10,10), extent: pt(50,50), fill: Color.red});
+      await client1.synced();
+      world1.get("m1").position = pt(100,100);
+      world2.get("m1").position = pt(20,20);
+      world2.get("m1").position = pt(30,30);
+      await client1.synced() && client2.synced();
+      expect(world2.get("m1").position).equals(world1.get("m1").position);
+      expect(world2.get("m1").position).equals(pt(45,45));
+
+      function posTransform(op1, op2) {
+        var c1 = op1.change, c2 = op2.change;
+        if (c1.prop === "position" && c2.prop === "position"
+         && c1.type === "setter" && c2.type === "setter"
+         && c1.target.id === c2.target.id
+         && c1.owner.id === c2.owner.id) {
+           op1.change = op2.change = Object.assign({}, op1.change, {
+             value: c1.value.addPt(c2.value.subPt(c1.value).scaleBy(.5))})
+          return {op1, op2, handled: true}
+        }
+        return {op1, op2, handled: false};
+      }
+
+    });
   });
-
-
-});
-
-describe("transforms", () => {
 
 });
