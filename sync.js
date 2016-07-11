@@ -273,7 +273,7 @@ class Channel {
     this.online = false;
     this.debug = false;
     this.lifetime = 100;
-
+    this._watchdogProcess = null
     this.goOnline();
   }
 
@@ -286,13 +286,13 @@ class Channel {
   goOnline() { this.online = true; this.watchdogProcess(); }
 
   watchdogProcess() {
-    if (!this.isOnline()) return;
-    setTimeout(() => {
+    if (!this.isOnline() || this._watchdogProcess) return;
+    this._watchdogProcess = setTimeout(() => {
+      this._watchdogProcess = null;
       if (this.queueAtoB.length) this.send([], this.senderRecvrA);
       else if (this.queueBtoA.length) this.send([], this.senderRecvrB);
       else return;
-      this.watchdogProcess();
-    }, 100 + num.random(50));
+    }, 800 + num.random(50));
   }
 
   isEmpty() {
