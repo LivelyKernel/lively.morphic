@@ -287,6 +287,7 @@ class Channel {
 
   watchdogProcess() {
     if (!this.isOnline() || this._watchdogProcess) return;
+
     this._watchdogProcess = setTimeout(() => {
       this._watchdogProcess = null;
       if (this.queueAtoB.length) this.send([], this.senderRecvrA);
@@ -305,16 +306,20 @@ class Channel {
       this.queueBtoA.length ? this.send([], this.senderRecvrB) : Promise.resolve()]);
   }
 
-  send(content, sender) {
-
+  componentsForSender(sender) {
     if (sender !== this.senderRecvrA && sender !== this.senderRecvrB)
       throw new Error(`send called with sender unknown to channel: ${sender}`);
+    return {
+      recvr: this.senderRecvrA === sender ? this.senderRecvrB : this.senderRecvrA,
+      queue: this.senderRecvrA === sender ? this.queueAtoB : this.queueBtoA,
+      delay: this.senderRecvrA === sender ? this.delayAtoB : this.delayBtoA,
+      method: this.senderRecvrA === sender ? this.onReceivedMethodB : this.onReceivedMethodA,
+      descr: this.senderRecvrA === sender ? "AtoB" : "BtoA"
+    }
+  }
 
-    var recvr = this.senderRecvrA === sender ? this.senderRecvrB : this.senderRecvrA,
-        queue = this.senderRecvrA === sender ? this.queueAtoB : this.queueBtoA,
-        delay = this.senderRecvrA === sender ? this.delayAtoB : this.delayBtoA,
-        method = this.senderRecvrA === sender ? this.onReceivedMethodB : this.onReceivedMethodA,
-        descr = this.senderRecvrA === sender ? "AtoB" : "BtoA";
+  send(content, sender) {
+    var { recvr, queue, delay, method, descr, } = this.componentsForSender(sender);
 
     if (this.debug) {
       var msgs = (Array.isArray(content) ? content : [content]);
@@ -328,37 +333,33 @@ class Channel {
 
     queue.push(...(Array.isArray(content) ? content : [content]));
 
+    return this.deliver(sender);
+  }
+
+  deliver(sender) {
+
+    var { recvr, method, queue, delay, descr } = this.componentsForSender(sender);
+
     this.watchdogProcess();
 
-    // try again later...
-    if (!this.isOnline()) return;
+    // try again later via watchdogProcess
+    if (!this.isOnline()) return Promise.resolve();
 
+      Promise.resolve().then(() => {
+        if (!delay) {
+          var outgoing = queue.slice(); queue.length = 0;
+          try { recvr[method](outgoing, sender, this); }
+          catch (e) { console.error(`Error in ${method} of ${recvr}: ${e.stack || e}`); }
+        } else {
+          fun.throttleNamed(`${this.id}-${descr}`, delay*1000, () => {
+            var outgoing = queue.slice(); queue.length = 0;
+            try { recvr[method](outgoing, sender, this); }
+            catch (e) { console.error(`Error in ${method} of ${recvr}: ${e.stack || e}`); }
+          })();
+        }
+      });
 
-    return Promise.resolve().then(() =>
-      new Promise((resolve, reject) => {
-        try {
-          recvr[method](queue, sender, this);
-          resolve();
-        } catch (e) {
-          console.error(`Error in ${method} of ${recvr}: ${e.stack || e}`);
-          reject(e);
-        } finally { queue.length = 0; }
-      })
-      // new Promise((resolve, reject) =>
-      //   fun.throttleNamed(`${this.id}-${descr}`, delay, () => {
-      //     try {
-      //       recvr[method](queue, sender, this);
-      //       resolve();
-      //     } catch (e) {
-      //       console.error(`Error in ${method} of ${recvr}: ${e.stack || e}`);
-      //       reject(e);
-      //     } finally { queue.length = 0; }
-      //   })())
-        )
-        .catch(err => {
-          console.error(`Error in channel.send ${sender} -> ${recvr}: ${err}`);
-          throw err;
-        })
+    return promise.waitFor(() => queue.length === 0);
   }
 }
 
