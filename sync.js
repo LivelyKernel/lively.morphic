@@ -484,6 +484,18 @@ export class Client {
     opChannel.goOnline();
   }
 
+  set delay(d) {
+    var {opChannel} = this.state.connection;
+    if (opChannel) {
+      opChannel.delayAtoB = d;
+      opChannel.delayBtoA = d;
+    }
+  }
+
+  get delay() {
+    var {opChannel} = this.state.connection;
+    return opChannel ? opChannel.delayAtoB : 0
+  }
   // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
   // "locking" – meta operation sent to everyone to prevent
   // changes while some other operation happens
