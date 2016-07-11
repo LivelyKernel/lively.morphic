@@ -382,7 +382,6 @@ export class ClientState {
     this.connection = {opChannel: null, metaChannel: null};
     this.metaMessageCallbacks = {};
     this.transformFunctions = [morphicDefaultTransform];
-    this.delay = 0;
   }
 
 }
