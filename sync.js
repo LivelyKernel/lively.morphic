@@ -173,16 +173,56 @@ function nullTransform(op1, op2) {
 }
 
 function morphicDefaultTransform(op1, op2, syncer) {
-  var c1 = op1.change, c2 = op2.change;
-  if (c1.prop === "position" && c2.prop === "position"
-   && c1.type === "setter" && c2.type === "setter"
-   && c1.target.id === c2.target.id
-   && c1.owner.id === c2.owner.id) {
-     op1.change = op2.change = Object.assign({}, op1.change, {
-       value: c1.value.addPt(c2.value.subPt(c1.value).scaleBy(.5))})
+  var c1 = op1.change, c2 = op2.change,
+      {prop: prop1, type: type1, target: {id: target1}, owner: owner1, value: value1, selector: selector1, args: args1, creator: creator1} = c1,
+      {prop: prop2, type: type2, target: {id: target2}, owner: owner2, value: value2, selector: selector2, args: args2, creator: creator2} = c2;
 
-    return {op1, op2, handled: true}
+  if (target1 === target2) {
+
+    // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+    // position
+    if (prop1 === "position" && prop2 === "position"
+     && type1 === "setter" && type2 === "setter"
+    // && owner1.id === owner2.id
+     ) {
+       op1.change = op2.change = Object.assign({}, c1, {
+         value: value1.addPt(value2.subPt(value1).scaleBy(.5))});
+       return {op1, op2, handled: true}
+    }
+
   }
+
+  // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+  // addMorph...
+  if (selector1 === "addMorphAt" && selector2 === "addMorphAt") {
+    
+    // ...same owner, different morphs => transform order
+    if (target1 === target2 && args1[0].spec._id !== args2[0].spec._id) {
+       var newArgs1 = [args1[0], op1.creator < op2.creator ? args1[1] : args2[1]+1],
+           newArgs2 = [args2[0], op1.creator < op2.creator ? args1[1]+1 : args2[1]];
+       op1.change = Object.assign({}, c1, {args: newArgs1});
+       op2.change = Object.assign({}, c2, {args: newArgs2});
+       return {op1, op2, handled: true}
+    }
+
+    // ...same morph, different owners => one wins
+    else if (args1[0].spec._id === args2[0].spec._id) {
+      if (op1.creator < op2.creator) op2.change = Object.assign({}, c1);
+      else op1.change = Object.assign({}, c2);
+      return {op1, op2, handled: true}
+    }
+
+    // inverse addMorph
+    else if (target1 === args2[0].spec._id && target2 === args1[0].spec._id) {
+      if (op1.creator < op2.creator) op2.change = Object.assign({}, c1);
+      else op1.change = Object.assign({}, c2);
+      // console.log(op1)
+      // console.log(op2)
+      return {op1, op2, handled: true}
+    }
+
+  }
+
 
   return {op1, op2, handled: false};
 }
@@ -193,6 +233,12 @@ function runTransforms(op1, op2, tfmFns, syncer) {
   for (let tfmFn of tfmFns) {
     try {
       var {op1, op2, handled} = tfmFn(op1, op2, syncer);
+
+if (handled && op1.change.selector === "addMorphAt" && op2.change.selector === "addMorphAt") {
+  console.log(`${syncer}:\n  ${op1}\n  ${op2}`)
+  console.log(`${syncer.state.objects.get(op1.change.target.id)}\n${syncer.state.objects.get(op1.change.args[0].spec._id)}`)
+}
+
       if (handled) break;
     } catch (e) {
       console.error(`Error while transforming ${op1} with ${op2}:\n ${e.stack || e}`);
@@ -697,7 +743,7 @@ export class Client {
   // transform functions
   // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-  getTransforms() { this.state.transformFunctions; }
+  getTransforms() { return this.state.transformFunctions; }
   setTransforms(tfms) {
     this.state.transformFunctions = tfms;
     return this.syncTransforms();

@@ -2,7 +2,7 @@
 
 import { expect } from "mocha-es6";
 import { morph } from "../index.js";
-import { promise } from "lively.lang";
+import { promise, tree } from "lively.lang";
 import { pt, Color, Rectangle } from "lively.graphics";
 import { Client, Master } from "lively.morphic/sync.js";
 import { buildTestWorld, destroyTestWorld } from "./helper.js";
@@ -115,9 +115,9 @@ describe("syncing master with two clients", function() {
       prop: "submorphs",
       target: {type: "lively-sync-morph-ref", id: world1.id},
       type: "method-call",
-      selector: "addMorph",
+      selector: "addMorphAt",
       receiver: {type: "lively-sync-morph-ref", id: world1.id},
-      args: [{type: "lively-sync-morph-spec", spec: {name: "m1", position: pt(10,10), extent: pt(50,50)}}]
+      args: [{type: "lively-sync-morph-spec", spec: {name: "m1", position: pt(10,10), extent: pt(50,50)}}, 0]
     }
     expect(client1.history[0].change).containSubset(expectedChange);
     expect(client2.history).to.have.length(1);
@@ -146,7 +146,7 @@ describe("syncing master with two clients", function() {
     await client1.synced();
     expect(client1.history).to.have.length(2);
     expect(master.history).to.have.length(2);
-    expect(master.history[0]).to.containSubset({change: {type: "method-call", selector: "addMorph"}});
+    expect(master.history[0]).to.containSubset({change: {type: "method-call", selector: "addMorphAt"}});
     expect(master.history[1]).to.containSubset({change: {type: "setter", prop: "position", value: pt(14,14)}});
   });
 
@@ -231,60 +231,112 @@ describe("syncing master with two clients", function() {
   describe("transforms", () => {
 
 
-    it("set transform and resolve simpoe conflict", async () => {
+    describe("color conflict", () => {
 
-      // setup(2)
-      // teardown();
+      it("merge color", async () => {
+  
+        // setup(2)
+        // teardown();
+  
+        var {world1, world2, masterWorld, client1, client2, master} = state;
+  
+        var tfm = (op1, op2) => {
+          var v1 = op1.change.value,
+              v2 = op2.change.value,
+              resolvedValue = op1.creator < op2.creator ? v1 : v2
+          op1.change.value = resolvedValue;
+          op2.change.value = resolvedValue;
+          return {op1, op2}
+        }
+  
+        await client1.setTransforms([tfm])
+  
+        // client1.state.transformFunctions = [tfm];
+        // client2.state.transformFunctions = [tfm];
+        // master.state.transformFunctions =  [tfm];
+  
+        world1.fill = Color.green;
+        world2.fill = Color.blue;
+        await client1.synced() && client2.synced();
+  
+        expect(masterWorld.fill).equals(Color.green, "master");
+        expect(world1.fill).equals(Color.green, "client1");
+        expect(world2.fill).equals(Color.green, "client2");
+      });
 
-      var {world1, world2, masterWorld, client1, client2, master} = state;
-
-      var tfm = (op1, op2) => {
-        var v1 = op1.change.value,
-            v2 = op2.change.value,
-            resolvedValue = op1.creator < op2.creator ? v1 : v2
-        op1.change.value = resolvedValue;
-        op2.change.value = resolvedValue;
-        return {op1, op2}
-      }
-
-      await client1.setTransforms([tfm])
-
-      // client1.state.transformFunctions = [tfm];
-      // client2.state.transformFunctions = [tfm];
-      // master.state.transformFunctions =  [tfm];
-
-      world1.fill = Color.green;
-      world2.fill = Color.blue;
-      await client1.synced() && client2.synced();
-
-      expect(masterWorld.fill).equals(Color.green, "master");
-      expect(world1.fill).equals(Color.green, "client1");
-      expect(world2.fill).equals(Color.green, "client2");
     });
 
-    it("resolves morph position conflict", async () => {
-      var {world1, world2, masterWorld, client1, client2, master} = state;
-      var m = world1.addMorph({name: "m1", position: pt(10,10), extent: pt(50,50), fill: Color.red});
-      await client1.synced();
-      world1.get("m1").position = pt(100,100);
-      world2.get("m1").position = pt(20,20);
-      world2.get("m1").position = pt(30,30);
-      await client1.synced() && client2.synced();
-      expect(world2.get("m1").position).equals(world1.get("m1").position);
-      expect(world2.get("m1").position).equals(pt(45,45));
-
-      function posTransform(op1, op2) {
-        var c1 = op1.change, c2 = op2.change;
-        if (c1.prop === "position" && c2.prop === "position"
-         && c1.type === "setter" && c2.type === "setter"
-         && c1.target.id === c2.target.id
-         && c1.owner.id === c2.owner.id) {
-           op1.change = op2.change = Object.assign({}, op1.change, {
-             value: c1.value.addPt(c2.value.subPt(c1.value).scaleBy(.5))})
-          return {op1, op2, handled: true}
+    describe("position conflict", () => {
+      
+      it("resolved into geometric mean", async () => {
+        var {world1, world2, masterWorld, client1, client2, master} = state;
+        var m = world1.addMorph({name: "m1", position: pt(10,10), extent: pt(50,50), fill: Color.red});
+        await client1.synced();
+        world1.get("m1").position = pt(100,100);
+        world2.get("m1").position = pt(20,20);
+        world2.get("m1").position = pt(30,30);
+        await client1.synced() && client2.synced();
+        expect(world2.get("m1").position).equals(world1.get("m1").position);
+        expect(world2.get("m1").position).equals(pt(45,45));
+  
+        function posTransform(op1, op2) {
+          var c1 = op1.change, c2 = op2.change;
+          if (c1.prop === "position" && c2.prop === "position"
+           && c1.type === "setter" && c2.type === "setter"
+           && c1.target.id === c2.target.id
+           && c1.owner.id === c2.owner.id) {
+             op1.change = op2.change = Object.assign({}, op1.change, {
+               value: c1.value.addPt(c2.value.subPt(c1.value).scaleBy(.5))})
+            return {op1, op2, handled: true}
+          }
+          return {op1, op2, handled: false};
         }
-        return {op1, op2, handled: false};
-      }
+  
+      });
+
+    });
+
+    describe("addMorph", () => {
+      
+      it("addMorphs into same owner, order fixed", async () => {
+        var {world1, world2, client1, client2} = state,
+            m1 = morph({name: "m1", position: pt(10,10), extent: pt(50,50), fill: Color.red}),
+            m2 = morph({name: "m2", position: pt(20,20), extent: pt(50,50), fill: Color.green});
+        world1.addMorph(m1);
+        world2.addMorph(m2);
+        await client1.synced() && client2.synced();
+        expect(world1.submorphs.map(ea => ea.name)).equals(["m1", "m2"]);
+        expect(world2.submorphs.map(ea => ea.name)).equals(["m1", "m2"]);
+      });
+
+      it("addMorphs of same morph, one creator wins", async () => {
+        var {world1, world2, client1, client2} = state,
+            m1 = world1.addMorph({name: "m1", position: pt(10,10), extent: pt(50,50), fill: Color.red}),
+            m2 = world1.addMorph({name: "m2", position: pt(20,20), extent: pt(50,50), fill: Color.green}),
+            m3 = world1.addMorph({name: "m3", position: pt(30,30), extent: pt(50,50), fill: Color.blue});
+        await client1.synced();
+        world1.get("m2").addMorph(world1.get("m1"));
+        world2.get("m3").addMorph(world2.get("m1"));
+        await client1.synced() && client2.synced();
+        var tree1 = tree.mapTree(world1, (morph, names) => [morph.name, ...names], morph => morph.submorphs),
+            tree2 = tree.mapTree(world2, (morph, names) => [morph.name, ...names], morph => morph.submorphs);
+        expect(tree1).deep.equals(["world", ["m2", ["m1"]], ["m3"]]);
+        expect(tree2).deep.equals(["world", ["m2", ["m1"]], ["m3"]]);
+      });
+
+      it("addMorph, inverse m1 <-> m2", async () => {
+        var {world1, world2, client1, client2} = state,
+            m1 = world1.addMorph({name: "m1", position: pt(10,10), extent: pt(50,50), fill: Color.red}),
+            m2 = world1.addMorph({name: "m2", position: pt(20,20), extent: pt(50,50), fill: Color.green});
+        await client1.synced();
+        world1.get("m1").addMorph(world1.get("m2"));
+        world2.get("m2").addMorph(world2.get("m1"));
+        await client1.synced() && client2.synced();
+        var tree1 = tree.mapTree(world1, (morph, names) => [morph.name, ...names], morph => morph.submorphs),
+            tree2 = tree.mapTree(world2, (morph, names) => [morph.name, ...names], morph => morph.submorphs);
+        expect(tree1).deep.equals(["world", ["m1", ["m2"]]]);
+        expect(tree2).deep.equals(["world", ["m1", ["m2"]]]);
+      });
 
     });
   });
