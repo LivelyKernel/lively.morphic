@@ -234,12 +234,12 @@ describe("syncing master with two clients", function() {
     describe("color conflict", () => {
 
       it("merge color", async () => {
-  
+
         // setup(2)
         // teardown();
-  
+
         var {world1, world2, masterWorld, client1, client2, master} = state;
-  
+
         var tfm = (op1, op2) => {
           var v1 = op1.change.value,
               v2 = op2.change.value,
@@ -248,17 +248,17 @@ describe("syncing master with two clients", function() {
           op2.change.value = resolvedValue;
           return {op1, op2}
         }
-  
+
         await client1.setTransforms([tfm])
-  
+
         // client1.state.transformFunctions = [tfm];
         // client2.state.transformFunctions = [tfm];
         // master.state.transformFunctions =  [tfm];
-  
+
         world1.fill = Color.green;
         world2.fill = Color.blue;
         await client1.synced() && client2.synced();
-  
+
         expect(masterWorld.fill).equals(Color.green, "master");
         expect(world1.fill).equals(Color.green, "client1");
         expect(world2.fill).equals(Color.green, "client2");
@@ -267,7 +267,7 @@ describe("syncing master with two clients", function() {
     });
 
     describe("position conflict", () => {
-      
+
       it("resolved into geometric mean", async () => {
         var {world1, world2, masterWorld, client1, client2, master} = state;
         var m = world1.addMorph({name: "m1", position: pt(10,10), extent: pt(50,50), fill: Color.red});
@@ -278,7 +278,7 @@ describe("syncing master with two clients", function() {
         await client1.synced() && client2.synced();
         expect(world2.get("m1").position).equals(world1.get("m1").position);
         expect(world2.get("m1").position).equals(pt(45,45));
-  
+
         function posTransform(op1, op2) {
           var c1 = op1.change, c2 = op2.change;
           if (c1.prop === "position" && c2.prop === "position"
@@ -291,13 +291,13 @@ describe("syncing master with two clients", function() {
           }
           return {op1, op2, handled: false};
         }
-  
+
       });
 
     });
 
     describe("addMorph", () => {
-      
+
       it("addMorphs into same owner, order fixed", async () => {
         var {world1, world2, client1, client2} = state,
             m1 = morph({name: "m1", position: pt(10,10), extent: pt(50,50), fill: Color.red}),
