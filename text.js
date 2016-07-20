@@ -2,6 +2,8 @@ import { string } from "lively.lang";
 import { Morph, show } from "./index.js";
 import { FontMetric } from "./rendering/renderer.js";
 
+import {h} from "virtual-dom";
+
 export class Text extends Morph {
 
   static makeLabel(string, props) {
@@ -95,26 +97,35 @@ export class Text extends Morph {
     super.aboutToRender();
     this.fitIfNeeded();
   }
-
-  render(renderer) {
-    var tree = super.render(renderer);
-    var domNode = renderer.getNodeForMorph(this);
-    this.selectIfNeeded(renderer);
-    return tree;
-  }
-
-  shape() {
-    return {
-      value: this.textString,
-      readOnly: this.readOnly,
-      placeholder: this.placeholder,
-      style: {
-        resize: "none", border: 0,
-       "white-space": "nowrap", padding: "0px",
-       "font-family": this.fontFamily,
-       "font-size": this.fontSize + "px"
-     }
-    }
+  
+  shape(self, style, submorphs) {
+    var {
+      extent: {x: width, y: height},
+      fill, borderWidth, borderColor, borderRadius: br,
+      reactsToPointer, nativeCursor, styleClasses, clipMode,
+    } = self;
+    return h("textarea", 
+            {id: self.id,
+             draggable: false,
+             value: self.textString,
+             readOnly: self.readOnly,
+             placeholder: self.placeholder,
+             style: {
+                ...style,
+                position: 'absolute',
+                width: width + 'px', height: height + 'px',
+                backgroundColor: fill ? fill.toString() : "",
+                overflow: clipMode,
+                // "box-shadow": `inset 0 0 0 ${borderWidth}px ${borderColor ? borderColor.toString() : "transparent"}`,
+                // borderRadius: `${br.top()}px ${br.top()}px ${br.bottom()}px ${br.bottom()}px / ${br.left()}px ${br.right()}px ${br.right()}px ${br.left()}px`,
+                cursor: nativeCursor,
+                resize: "none", border: 0,
+               "white-space": "nowrap", padding: "0px",
+               "font-family": this.fontFamily,
+               "font-size": this.fontSize + "px"
+             },
+             selectionStart: self._selection.start,
+             selectionEnd: self._selection.end});
   }
 
   fit() {
@@ -132,18 +143,6 @@ export class Text extends Morph {
 
   fitIfNeeded() {
     if (this._needsFit) { this.fit(); this._needsFit = false; }
-  }
-
-  select(renderer) {
-    var domNode = renderer.getNodeForMorph(this);
-    domNode && ({ start: domNode.selectionStart, end: domNode.selectionEnd } = this._selection);
-  }
-
-  selectIfNeeded(renderer) {
-    if (this._needsSelect) {
-      this.select(renderer);
-      this._needsSelect = false;
-    }
   }
 
   onInput(evt) {

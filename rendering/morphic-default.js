@@ -42,46 +42,22 @@ export function renderMorph(morph, renderer) {
     reactsToPointer,
     owner
   } = morph;
+  
+  var style = {transform: new Transform()
+                                  .preConcatenate(new Transform(morph.origin))
+                                  .preConcatenate(morph.getTransform())
+                                  .preConcatenate(new Transform(morph.origin).inverse())
+                                  .preConcatenate(new Transform(owner && owner.origin))
+                                  .toCSSTransformString(),
+                transformOrigin: `${origin.x}px ${origin.y}px `,
+                position: "absolute",
+                display: visible ? "" : "none",
+                width: width + 'px', height: height + 'px',
+                overflow: clipMode,
+                "pointer-events": reactsToPointer ? "auto" : "none",
+                WebkitFilter: morph.dropShadow ? shadowCss(morph) : null};
 
-  var shapedStyle = Object.assign(
-
-    {
-      transform: new Transform()
-                        .preConcatenate(new Transform(morph.origin))
-                        .preConcatenate(morph.getTransform())
-                        .preConcatenate(new Transform(morph.origin).inverse())
-                        .preConcatenate(new Transform(owner && owner.origin))
-                        .toCSSTransformString(),
-      transformOrigin: `${origin.x}px ${origin.y}px `,
-      position: "absolute",
-      display: visible ? "" : "none",
-      width: width + 'px', height: height + 'px',
-      backgroundColor: fill ? fill.toString() : "",
-      "box-shadow": `inset 0 0 0 ${borderWidth}px ${borderColor ? borderColor.toString() : "transparent"}`,
-      borderRadius: `${br.top()}px ${br.top()}px ${br.bottom()}px ${br.bottom()}px / ${br.left()}px ${br.right()}px ${br.right()}px ${br.left()}px`,
-      overflow: clipMode,
-      "pointer-events": reactsToPointer ? "auto" : "none",
-      cursor: morph.nativeCursor
-    },
-
-    morph.dropShadow ? {
-      WebkitFilter: shadowCss(morph)
-    } : null,
-
-    morph.shape().style
-  );
-
-  var attributes = Object.assign(
-    morph.shape(), {
-      id: morph.id,
-      className: morph.styleClasses.join(" "),
-      draggable: false,
-      style: shapedStyle
-   });
-
-  var tree = h(
-    morph._nodeType, attributes,
-    morph.submorphs.map(m => m.render(renderer)));
+  var tree = morph.shape(morph, style, morph.submorphs.map(m => m.render(renderer)));
 
   renderer.renderMap.set(morph, tree);
   return tree;

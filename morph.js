@@ -7,6 +7,8 @@ import { show, StatusMessage } from "./markers.js";
 import { morph } from "./index.js";
 import config from "./config.js";
 
+import {h} from "virtual-dom"
+
 
 const defaultProperties = {
   visible: true,
@@ -127,8 +129,25 @@ export class Morph {
     if (this.owner) this.owner.makeDirty();
   }
 
-  shape() {
-    return {}
+  shape(self, style, submorphs) {
+    var {
+      extent: {x: width, y: height},
+      fill, borderWidth, borderColor, borderRadius: br,
+      reactsToPointer, nativeCursor, styleClasses
+    } = self;
+    return h("div" , {
+      id: self.id,
+      draggable: false,
+      className: styleClasses.join(" "),
+      style: {...style,
+        position: 'absolute',
+        width: width + 'px', height: height + 'px',
+        backgroundColor: fill ? fill.toString() : "",
+        "box-shadow": `inset 0 0 0 ${borderWidth}px ${borderColor ? borderColor.toString() : "transparent"}`,
+        borderRadius: `${br.top()}px ${br.top()}px ${br.bottom()}px ${br.bottom()}px / ${br.left()}px ${br.right()}px ${br.right()}px ${br.left()}px`,
+        cursor: nativeCursor,
+      }
+    }, submorphs);
   }
 
   // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -548,7 +567,7 @@ export class Morph {
   }
 
   innerBoundsContainsPoint(p) { // p is in local coordinates (offset by origin)
-    return this.innerBounds().containsPoint(p.addPt(this.origin));  
+    return this.innerBounds().containsPoint(p.addPt(this.origin));
   }
 
   // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -967,15 +986,33 @@ export class Image extends Morph {
 
   get isImage() { return true }
 
-  get _nodeType() { return 'img'; }
-
   get imageUrl()       { return this.getProperty("imageUrl"); }
   set imageUrl(value)  { this.recordChange({prop: "imageUrl", value}); }
 
-  shape() {
-    return {
-      src: this.imageUrl
-    }
+  shape(self, style, submorphs) {
+    var {
+      extent: {x: width, y: height},
+      fill, borderWidth, borderColor, borderRadius: br,
+      reactsToPointer, nativeCursor, styleClasses
+    } = self;
+    return h("div" , {
+      id: self.id,
+      draggable: false,
+      className: styleClasses.join(" "),
+      style: {
+        ...style,
+        position: 'absolute',
+        width: width + 'px', height: height + 'px',
+        backgroundColor: fill ? fill.toString() : "",
+        "box-shadow": `inset 0 0 0 ${borderWidth}px ${borderColor ? borderColor.toString() : "transparent"}`,
+        borderRadius: `${br.top()}px ${br.top()}px ${br.bottom()}px ${br.bottom()}px / ${br.left()}px ${br.right()}px ${br.right()}px ${br.left()}px`,
+        cursor: nativeCursor,
+      }
+    }, [h("img", {src: this.imageUrl,
+                  style: {
+                    position: 'absolute',
+                    width: width + 'px', height: height + 'px',
+                    "pointer-events": "none"}})].concat(submorphs));
   }
 }
 
