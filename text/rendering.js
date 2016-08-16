@@ -16,7 +16,7 @@ export function renderText(renderer, textMorph) {
           "white-space": "pre",
           "padding": `${padding.top()}px ${padding.right()}px ${padding.bottom()}px ${padding.left()}px`,
           "font-family": textMorph.fontFamily,
-          "font-size": textMorph.fontSize + "px",
+          "font-size": (textMorph.fontSize + 3) + "px",
           "color": String(textMorph.fontColor)
         }
       }, [textString.substring(0, selection.start),
