@@ -1330,3 +1330,133 @@ export class GridLayout extends Layout {
   }
 
 }
+
+class FlexLayout extends Layout {
+
+  static get propertySettings() {
+    return {
+      defaultSetter(key, value) { this.setProperty(key, value); },
+      valueStoreProperty: "_state"
+    }
+  }
+
+  setProperty(key, value) {
+    this._state[key] = value;
+    this.container && this.container.makeDirty();
+  }
+
+  inspect(pointerId) {
+    return new FlexLayoutHalo(this.container, pointerId);
+  }
+
+  onSubmorphResized(submorph, change) {}
+  onSubmorphAdded(submorph, animation) {}
+  onSubmorphRemoved(submorph, animation) {}
+
+  onChange({selector, args, prop, value, prevValue, meta}) {}
+  
+}
+
+export class FlexItem extends FlexLayout {
+
+  constructor({
+    order = 0,
+    shrink = 1,
+    growth = 1
+  } = {}) {
+    let args = {order, shrink, growth}
+    super(args)
+    Object.assign(this, args)
+  }
+
+  static get properties() {
+    return {
+      isFlexItem: {
+        readOnly: true,
+        get() { return true}
+      },
+      order: {
+        type: "number",
+        min: 0,
+        defaultValue: 0
+      },
+      shrink: {
+        type: 'number',
+        min: 0,
+        defaultValue: 1
+      },
+      grow: {
+        type: 'number',
+        min: 0,
+        defaultValue: 1
+      }      
+    }
+  }
+
+  toCss() {
+    return {order: this.order, 'flex-gorw': this.grow, 'flex-shrink': this.shrink}
+  }
+  
+}
+
+export class FlexContainer extends FlexLayout {
+  
+  constructor({
+    direction = "row", 
+    wrap = "nowrap",
+    justifyContent = 'flex-start',
+    alignSubmorphs = 'stretch',
+    alignContent = 'stretch'
+  } = {}) {
+    let args = {direction, wrap, alignSubmorphs, alignContent, justifyContent}
+    super(args)
+    Object.assign(this, args)
+  }
+
+   static get properties() {
+     return {
+       isFlexContainer: {
+         readOnly: true,
+         defaultValue: true,
+         get() { return true }
+       },
+       direction: {
+         type: 'Enum',
+         values: ['row', 'row-revers', 'column', 'column-reverse'],
+         defaultValue: 'row'
+       },
+       wrap: {
+         type: 'Enum',
+         values: ['nowrap', 'wrap', 'wrap-reverse'],
+         defaultValue: 'nowrap'
+       },
+       justifyContent: {
+         type: 'Enum',
+         values: ['flex-start', 'flex-end', 'center', 'space-between', 'space-around'],
+         defaultValue: 'flex-start'
+       },
+       alignSubmorphs: {
+         type: 'Enum',
+         values: ['stretch', 'baseline', 'center', 'flex-end', 'flex-start'],
+         defaultValue: 'stretch'
+       },
+       alignContent: {
+         type: 'Enum',
+         values: ['stretch', 'space-between', 'space-around', 'center', 'flex-end', 'flex-start'],
+         defaultValue: 'stretch'
+       }
+     }
+   }
+
+  toCss() {
+    return {
+      display: "flex",
+      "flex-direction": this.direction,
+      "flex-wrap": this.wrap,
+      "justify-content": this.justifyContent,
+      'align-items': this.alignSubmorphs,
+      'align-content': this.alignContent 
+    };  
+  }
+  
+}
