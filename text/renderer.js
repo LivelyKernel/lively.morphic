@@ -463,13 +463,15 @@ export default class Renderer {
     // figure out where the visible area of the text starts / ends in terms of
     // visible lines
 
+    const onlyVisibleLines = !!config.renderOnlyVisibleContent.text;
+
     let {
       line: startLine,
       offset: startOffset,
       y: heightBefore,
       row: startRow
     } = doc.findLineByVerticalOffset(Math.max(0, scrollTop - padTop))
-     || doc.getLine(0) || {startRow: 0, heightBefore: 0, startOffset: 0};
+     || {line: doc.getLine(0), row: 0, y: 0, offset: 0};
 
     let {
       line: endLine,
@@ -477,7 +479,7 @@ export default class Renderer {
       y: endY,
       row: endRow
     } = doc.findLineByVerticalOffset(Math.min(doc.height, (scrollTop - padTop) + scrollHeight))
-     || doc.getLine(doc.rowCount-1) || {endRow: 0, endLineOffset: 0, endY: 0};
+     || {line: doc.getLine(doc.rowCount-1), row: 0, offset: 0, y: 0};
 
     let firstVisibleRow = startRow,
         firstFullyVisibleRow = startOffset === 0 ? startRow : startRow + 1,
@@ -487,12 +489,21 @@ export default class Renderer {
     // render lines via virtual-dom
 
     let visibleLines = [],
-        renderedLines = [];
+        renderedLines = [],
+        line = startLine,
+        i = startRow,
+        beforeFillerHeight = heightBefore;
+
+    if (!onlyVisibleLines) {
+      i = 0;
+      line = doc.getLine(0);
+      endLine = doc.getLine(doc.rowCount-1);
+      beforeFillerHeight = 0;
+    }
 
     // spacer to push visible lines into the scrolled area
-    renderedLines.push(h("div.newtext-before-filler", {style: {height: heightBefore + "px"}}));
+    renderedLines.push(h("div.newtext-before-filler", {style: {height: beforeFillerHeight + "px"}}));
 
-    let line = startLine, i = startRow;
     while (line) {
       visibleLines.push(line);
       // renderedLines.push(line._rendered || (line._rendered = this.renderLine(h, morph, line)));
@@ -501,6 +512,8 @@ export default class Renderer {
       if (line === endLine) break;
       line = line.nextLine();
     }
+
+    if (!onlyVisibleLines) { visibleLines = visibleLines.slice(startRow, endRow); }
 
     Object.assign(morph.viewState, {
       scrollTop, scrollHeight,
