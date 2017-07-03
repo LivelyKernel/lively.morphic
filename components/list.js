@@ -1,4 +1,4 @@
-import { Morph, GridLayout, Text, StyleSheet, Label, Button, morph } from "lively.morphic";
+import { Morph, config, GridLayout, Text, StyleSheet, Label, Button, morph } from "lively.morphic";
 import { pt, LinearGradient, Color, Rectangle, rect } from "lively.graphics";
 import { arr, Path, string, obj } from "lively.lang";
 import { signal, once } from "lively.bindings";
@@ -254,7 +254,6 @@ var listCommands = [
   }
 ];
 
-
 export class List extends Morph {
 
   static get styleSheet() {
@@ -303,7 +302,7 @@ export class List extends Morph {
         set(value) {
           if (value.eqPt(this.extent)) return;
           this.setProperty("extent", value);
-          this.update();
+          this.renderOnlyVisibleItems && this.update();
         }
       },
 
@@ -428,6 +427,10 @@ export class List extends Morph {
         }
       },
 
+      renderOnlyVisibleItems: {
+        derived: true, readOnly: true,
+        get() { return config.renderOnlyVisibleContent.list; }
+      }
     }
   }
 
@@ -551,8 +554,14 @@ export class List extends Morph {
           padding = padding || Rectangle.inset(0),
           padTop = padding.top(), padLeft = padding.left(),
           padBottom = padding.bottom(), padRight = padding.right(),
-          firstItemIndex = Math.max(0, Math.floor((top + padTop - additionalSpace) / itemHeight)),
-          lastItemIndex = Math.min(items.length, Math.ceil((top + height + padTop + additionalSpace) / itemHeight)),
+          firstItemIndex = this.renderOnlyVisibleItems
+                         ? Math.max(0, Math.floor(
+                             (top + padTop - additionalSpace) / itemHeight))
+                         : 0,
+          lastItemIndex = this.renderOnlyVisibleItems
+                        ? Math.min(items.length, Math.ceil(
+                            (top + height + padTop + additionalSpace) / itemHeight))
+                        : items.length,
           maxWidth = 0,
           goalWidth = this.width - (padLeft + padRight);
 
@@ -609,7 +618,7 @@ export class List extends Morph {
     this.scroll = scroll.addXY(offsetX, offsetY);
   }
 
-  onScroll() { this.update(); }
+  onScroll() { this.renderOnlyVisibleItems && this.update(); }
 
   onItemMorphDoubleClicked(evt, itemMorph) {}
 

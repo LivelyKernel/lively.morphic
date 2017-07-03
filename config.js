@@ -1,6 +1,8 @@
 /*global System*/
 import { Rectangle, Color } from "lively.graphics";
 
+import bowser from "bowser"
+
 if (typeof $world !== "undefined") {
   $world.withAllSubmorphsDo(ea =>
     ea.hasOwnProperty("_cachedKeyhandlers") && (ea._cachedKeyhandlers = null));
@@ -52,6 +54,12 @@ var config = {
   repeatClickInterval: 250, // max time between clicks for double-, triple-click
   longClick: {minDur: 500, maxDur: 1000, maxDist: 2}, // time and distance for long-click
   showTooltipsAfter: .8,
+
+  renderOnlyVisibleContent: {    
+    list: bowser.chrome || bowser.mobile || bowser.tablet,
+    text: bowser.chrome || bowser.mobile || bowser.tablet,
+    tree: bowser.chrome || bowser.mobile || bowser.tablet
+  },
 
   ide: {
     js: {
