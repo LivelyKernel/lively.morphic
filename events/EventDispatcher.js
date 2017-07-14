@@ -19,6 +19,8 @@ const domEventsWeListenTo = [
   {type: 'scroll',      capturing: true},
   {type: 'wheel',       capturing: false},
 
+  {type: 'focusout',  capturing: false},
+
   {type: "drag",      capturing: false},
   {type: "dragstart", capturing: false},
   {type: "dragend",   capturing: false},
@@ -258,12 +260,14 @@ export default class EventDispatcher {
       let fn = evt => this.dispatchDOMEvent(evt);
       this.handlerFunctions.push({node: emitter, type, fn, capturing});
       emitter.addEventListener(type, fn, capturing);
+      console.log(`body.addEventListener(${type})`)
     });
 
     globalEmitter.addEventListener && globalDomEventsWeListenTo.forEach(({type, capturing, morphMethod}) => {
       let fn = evt => this.dispatchDOMEvent(evt, this.world, morphMethod);
       this.handlerFunctions.push({node: globalEmitter, type, fn, capturing});
       globalEmitter.addEventListener(type, fn, capturing);
+      console.log(`window.addEventListener(${type})`)
     });
 
     this.keyInputHelper = new TextInput(this).install(rootNode);
@@ -307,7 +311,9 @@ export default class EventDispatcher {
         events       = [defaultEvent],
         later        = [];
 
-
+    if (type !== 'pointermove') {
+      console.log(type)
+    }
     switch (type) {
 
       // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
@@ -513,6 +519,10 @@ export default class EventDispatcher {
         break;
       case "focus":
         events = focusEvents(this, targetMorph);
+        break;
+      case "focusout":
+        events = [new Event("blur", domEvt, this, [targetMorph], hand, halo, layoutHalo)
+                  .onDispatch(() => state.focusedMorph = null)]
         break;
 
       // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
