@@ -8,13 +8,7 @@ export * from "./html-morph.js";
 export * from "./env.js";
 export * from "./layout.js";
 export { StyleSheet } from "./style-sheets.js";
-export { show } from "./components/markers.js"
 export { ShadowObject } from "./rendering/morphic-default.js";
-export { Button } from "./components/buttons.js";
-export { Menu } from "./components/menus.js";
-export * from "./components/tooltips.js";
-export { Icon } from "./components/icons.js";
-export * from "./components/list.js";
 
 // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
@@ -22,13 +16,8 @@ import { World, Hand } from "./world.js";
 import { Morph, Image, Ellipse, Triangle, Path, Polygon, LineMorph } from "./morph.js";
 import { Text } from "./text/morph.js";
 import { Label } from "./text/label.js";
-import { Button } from "./components/buttons.js";
-import { CheckBox, LabeledCheckBox } from "./components/widgets.js";
-import { List } from "./components/list.js";
 import { HTMLMorph } from './html-morph.js';
-import Window from "./components/window.js";
 import InputLine from "./text/input-line.js";
-export { Window };
 
 export function morph(props = {}, opts = {restore: false}) {
   var klass = Morph;
@@ -45,10 +34,10 @@ export function morph(props = {}, opts = {restore: false}) {
         case 'text':     klass = Text; break;
         case 'input':    klass = InputLine; break;
         case 'label':    klass = Label; break;
-        case 'list':     klass = List; break;
-        case 'button':   klass = Button; break;
-        case 'checkbox': klass = CheckBox; break;
-        case 'labeledcheckbox': klass = LabeledCheckBox; break;
+        // case 'list':     klass = List; break;
+        // case 'button':   klass = Button; break;
+        // case 'checkbox': klass = CheckBox; break;
+        // case 'labeledcheckbox': klass = LabeledCheckBox; break;
         case 'polygon':  klass = Polygon; break;
         case 'line':     klass = LineMorph; break;
         case 'html':     klass = HTMLMorph; break;
