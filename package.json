@@ -9,6 +9,7 @@
     "bowser": "^1.4.1",
     "dom-to-image": "^2.5.2",
     "gsap": "^1.19.0",
+    "lively.components": "https://github.com/LivelyKernel/lively.components",
     "lively.bindings": "https://github.com/LivelyKernel/lively.bindings",
     "lively.graphics": "https://github.com/LivelyKernel/lively.graphics",
     "lively.lang": "^1.0.0",
