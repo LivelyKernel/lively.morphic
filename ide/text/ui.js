@@ -1,11 +1,10 @@
 /*global System,WeakMap*/
 import { fun, arr } from "lively.lang"
-import { show, HorizontalLayout, VerticalLayout, DropDownList, inspect, morph, Morph } from "../index.js";
+import { show, HorizontalLayout, VerticalLayout, inspect, morph, Morph, Icon, loadObjectFromPartsbinFolder } from "lively.morphic";
 import { pt, LinearGradient, Rectangle, Color } from "lively.graphics";
 import { connect, noUpdate } from "lively.bindings"
-import { Icon } from "lively.morphic/components/icons.js";
-import { loadObjectFromPartsbinFolder } from "../partsbin.js";
-// import { LabeledCheckBox } from "../components/widgets.js";
+
+import { DropDownList } from "lively.morphic/components/index.js";
 
 
 const cachedControls = new WeakMap();

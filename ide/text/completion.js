@@ -1,8 +1,10 @@
 /*global Map*/
 import { Color, Rectangle, pt } from "lively.graphics";
-import { morph, ShadowObject, StyleSheet, FilterableList } from "lively.morphic";
+import { morph, ShadowObject, StyleSheet } from "lively.morphic";
 import { connect } from "lively.bindings";
 import { arr, string } from "lively.lang";
+
+import { FilterableList } from "lively.morphic/components/index.js";
 
 
 export class Completer {
