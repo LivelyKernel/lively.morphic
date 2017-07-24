@@ -3,8 +3,7 @@
 import { obj, arr, num } from "lively.lang";
 import { Rectangle, rect, Color, pt } from "lively.graphics";
 import { connect, signal, disconnect } from "lively.bindings"; // for makeInputLine
-import { Text } from "../text/morph.js"
-import { Range } from "./range.js";
+import { Text, Range } from "lively.morphic";
 
 export default class InputLine extends Text {
 
