@@ -2730,9 +2730,8 @@ export class Image extends Morph {
     if (!['gif', 'jpeg', 'png', 'tiff'].includes(type)) type = 'gif';
     if (!urlString.startsWith('http'))
       urlString = location.origin + "/" + urlString;
-    let {runCommand} = await System.import("lively.morphic/ide/shell/shell-interface"),
-        cmd = 'curl --silent "' + urlString + '" | openssl base64',
-        {stdout} = await runCommand(cmd).whenDone();
+    let cmd = 'curl --silent "' + urlString + '" | openssl base64',
+        {stdout} = await this.execCommand('run command', cmd).whenDone();
     return this.loadUrl('data:image/' + type + ';base64,' + stdout, false);
   }
 

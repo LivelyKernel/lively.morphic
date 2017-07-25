@@ -842,7 +842,7 @@ export class Text extends Morph {
     // let modeName = "js"
     modeName = config.ide.modes.aliases[modeName] || modeName;
     let isAbsURL = /^[^:\\]+:\/\//.test(modeName),
-        url = isAbsURL ? modeName : `lively.morphic/ide/${modeName}/editor-plugin.js`;
+        url = isAbsURL ? modeName : `lively.ide/${modeName}/editor-plugin.js`;
     if (!await lively.modules.doesModuleExist(url)) return null;
     let {default: Mode} = await lively.modules.module(url).load();
     return Mode;
@@ -2760,7 +2760,7 @@ export class Text extends Morph {
           "https://cdnjs.cloudflare.com/ajax/libs/jsdiff/3.0.0/diff.js"
         ),
             {default: DiffEditorPlugin} = await System.import(
-              "lively.morphic/ide/diff/editor-plugin.js"
+              "lively.ide/diff/editor-plugin.js"
             ),
             indent = 0;
 

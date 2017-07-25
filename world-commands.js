@@ -363,9 +363,9 @@ var commands = [
     exec: async (world, opts = {}) => {
       var language = opts.language || "javascript",
           workspaceModules = {
-            "javascript": "lively.morphic/ide/js/workspace.js",
-            "shell": "lively.morphic/ide/shell/workspace.js",
-            "html": "lively.morphic/ide/html/workspace.js",
+            "javascript": "lively.ide/js/workspace.js",
+            "shell": "lively.ide/shell/workspace.js",
+            "html": "lively.ide/html/workspace.js",
             "text": null
           },
           alias = {"js": "javascript"};
@@ -393,7 +393,7 @@ var commands = [
   {
     name: "open shell terminal",
     exec: async (world, opts) => {
-      var { default: Terminal } = await System.import("lively.morphic/ide/shell/terminal.js");
+      var { default: Terminal } = await System.import("lively.ide/shell/terminal.js");
       return Terminal.open(opts).openInWorldNearHand();
     }
   },
@@ -455,7 +455,7 @@ var commands = [
           var content = [diff.createTwoFilesPatch(
                          filenameA || "a", filenameB || "b", a, b,
                          headerA, headerB, typeof context === "number" ? {context} : undefined), {}];
-          var { default: DiffEditorPlugin } = await System.import("lively.morphic/ide/diff/editor-plugin.js");
+          var { default: DiffEditorPlugin } = await System.import("lively.ide/diff/editor-plugin.js");
           plugin = new DiffEditorPlugin();
 
         } else {
@@ -559,7 +559,7 @@ var commands = [
         return null;
       }
       var { ObjectEditor } = await System.import(
-            "lively.morphic/ide/js/objecteditor/index.js"),
+            "lively.ide/js/objecteditor/index.js"),
           { target, className, methodName } = args;
       return await ObjectEditor.open(args);
     }
@@ -593,7 +593,7 @@ var commands = [
       var relayed = evt && world.relayCommandExecutionToFocusedMorph(evt);
       if (relayed) return relayed;
 
-      var { default: Browser } = await System.import("lively.morphic/ide/js/browser/index.js"),
+      var { default: Browser } = await System.import("lively.ide/js/browser/index.js"),
           loc = obj.select(args, ["packageName", "moduleName", "textPosition", "codeEntity", "systemInterface"]),
           browser = await Browser.browse(loc, {extent: pt(700, 600)});
       browser.getWindow().activate();
@@ -644,7 +644,7 @@ var commands = [
                           historyId: "lively.morphic-choose and browse package resources",
                           requester: browser, width: 700, multiSelect: true, fuzzy: "value.shortName"}),
           [jsModules, nonJsModules] = arr.partition(selected, ea => ea.url.match(/\.js(on)?/)),
-          { default: Browser } = await System.import("lively.morphic/ide/js/browser/index.js");
+          { default: Browser } = await System.import("lively.ide/js/browser/index.js");
 
       await Promise.all(jsModules.map(ea => {
         var loc = {packageName: ea.package, moduleName: ea.url}
@@ -674,7 +674,7 @@ var commands = [
 
       var browser = opts.browser
                  || (focused && focused.ownerChain().find(ea => ea.isBrowser)),
-          { default: Browser } = await System.import("lively.morphic/ide/js/browser/index.js"),
+          { default: Browser } = await System.import("lively.ide/js/browser/index.js"),
           { localInterface } = await System.import("lively-system-interface"),
           systemInterface = opts && opts.systemInterface ? opts.systemInterface :
             browser ? browser.systemInterface : localInterface,
@@ -730,7 +730,7 @@ var commands = [
           return browser.state.associatedSearchPanel.getWindow().activate();
       } else browser = null;
 
-      let { CodeSearcher } = await System.import("lively.morphic/ide/code-search.js"),
+      let { CodeSearcher } = await System.import("lively.ide/code-search.js"),
           { localInterface } = await System.import("lively-system-interface");
 
       let systemInterface = opts.systemInterface || (browser && browser.systemInterface);
@@ -766,7 +766,7 @@ var commands = [
     name: "open test runner",
     progressIndicator: "opening test runner...",
     exec: async world => {
-      var {default: TestRunner} = await System.import("lively.morphic/ide/test-runner.js");
+      var {default: TestRunner} = await System.import("lively.ide/test-runner.js");
       return await TestRunner.open();
     }
   },
@@ -775,7 +775,7 @@ var commands = [
     name: "open file browser",
     progressIndicator: "opening file browser...",
     exec: async (world, opts = {}) => {
-      var { default: HTTPFileBrowser } = await System.import("lively.morphic/ide/http-file-browser.js"),
+      var { default: HTTPFileBrowser } = await System.import("lively.ide/http-file-browser.js"),
           { location, file } = opts;
       var browser = file ?
         HTTPFileBrowser.forFile(file, location) :
@@ -809,7 +809,7 @@ var commands = [
       }
 
       if (lineNumber) url += ":" + lineNumber;
-      let { default: TextEditor } = await System.import("lively.morphic/ide/text-editor.js");
+      let { default: TextEditor } = await System.import("lively.ide/text-editor.js");
       return url ? TextEditor.openURL(url, obj.dissoc(opts, ["url"])) : null;
     }
   },
@@ -819,7 +819,7 @@ var commands = [
     exec: async (world, opts = {url: null, lineNumber: null}) => {
       // for using from command line, see l2l default client actions and
       // lively.shell/bin/lively-as-editor.js
-      var { default: TextEditor } = await System.import("lively.morphic/ide/text-editor.js"),
+      var { default: TextEditor } = await System.import("lively.ide/text-editor.js"),
           { url, lineNumber } = opts;
       // "saved" || "aborted"
       return  await TextEditor.openAsEDITOR(url, {});
