@@ -591,8 +591,7 @@ export class World extends Morph {
   }
 
   async showHaloFor(target, pointerId = this.firstHand && this.firstHand.pointerId, focus = true) {
-    var {default: Halo} = await System.import("lively.morphic/halo/morph.js"),
-        halo = this.addMorph(new Halo({pointerId, target}));
+    var halo = this.addMorph(this.execCommand("open halo", {pointerId, target}));
     if (focus) halo.focus()
     return halo;
   }
@@ -665,7 +664,7 @@ export class World extends Morph {
 
   setStatusMessageFor(morph, message, color, delay = 5000, props) {
     this.visibleStatusMessagesFor(morph).forEach(ea => ea.remove());
-    var msgMorph = new StatusMessageForMorph({message, color, ...props});
+    var msgMorph = this.execCommand("create status message for morph", {morph, message, color, ...props});
     this.openStatusMessage(msgMorph, delay);
     msgMorph.targetMorph = morph;
     msgMorph.fadeIn(300);
@@ -679,7 +678,7 @@ export class World extends Morph {
     // $world.setStatusMessage("test", Color.green)
     console[color == Color.red ? "error" : "log"](message);
     return config.verboseLogging ?
-      this.openStatusMessage(new StatusMessage({message, color, ...optStyle}), delay) :
+      this.openStatusMessage(this.execCommand("create status message", {message, color, ...optStyle}), delay) :
       null;
   }
 

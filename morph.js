@@ -16,7 +16,6 @@ import { copyMorph } from "./serialization.js";
 import { isNumber, isString } from "lively.lang/object.js";
 import { capitalize } from "lively.lang/string.js";
 import { connect, signal } from "lively.bindings";
-import { showAndSnapToGuides, removeSnapToGuidesOf } from "./halo/drag-guides.js";
 import { StylingVisitor } from "./sizzle.js";
 
 const defaultCommandHandler = new CommandHandler();
@@ -2195,13 +2194,13 @@ export class Morph {
 
   onDragEnd(evt) {
     this.undoStop("drag-move");
-    removeSnapToGuidesOf(this);
+    this.execCommand("remove snap guides", this);
   }
 
   onDrag(evt) {
     let {dragStartMorphPosition, absDragDelta} = evt.state;
     this.position = dragStartMorphPosition.addPt(absDragDelta);
-    showAndSnapToGuides(this, evt.isCtrlDown()/*show guides*/, evt.isCtrlDown()/*snap*/);
+    this.execCommand("show and snap to guides", this, evt.isCtrlDown()/*show guides*/, evt.isCtrlDown()/*snap*/);
   }
 
   onGrab(evt) {

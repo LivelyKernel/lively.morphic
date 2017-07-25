@@ -1,10 +1,5 @@
 import { pt, rect } from "lively.graphics";
 import { arr, Closure, num, grid, obj } from "lively.lang";
-import {
-  GridLayoutHalo,
-  FlexLayoutHalo,
-  TilingLayoutHalo
-} from "./halo/layout.js";
 import { isNumber } from "lively.lang/object.js";
 import { sortBy } from "lively.lang/array.js";
 
@@ -295,10 +290,6 @@ export class VerticalLayout extends FloatLayout {
   name() { return "Vertical" }
   description() { return "Assemble the submorphs in a vertically growing list." }
 
-  inspect(pointerId) {
-    return new FlexLayoutHalo(this.container, pointerId);
-  }
-
   get align() { return this._align; }
   set align(d) { this._align = d; this.apply(); }
 
@@ -371,8 +362,6 @@ export class HorizontalLayout extends FloatLayout {
 
   name() { return "Horizontal"; }
   description() { return "Assemble the submorphs in a horizontally growing list."; }
-
-  inspect(pointerId) { return new FlexLayoutHalo(this.container, pointerId); }
 
   get direction() { return this._direction; }
   set direction(d) { this._direction = d; this.apply(); }
@@ -466,10 +455,6 @@ export class TilingLayout extends Layout {
 
   name() { return "Tiling" }
   description() { return "Make the submorphs fill their owner, inserting breaks to defer intersecting the bounds as much as possible." }
-
-  inspect(pointerId) {
-    return new TilingLayoutHalo(this.container, pointerId);
-  }
 
   get spacing() { return this._spacing; }
   set spacing(offset) { this._spacing = offset; this.apply(); }
@@ -1342,10 +1327,6 @@ export class GridLayout extends Layout {
     const cellGroup = this.getCellGroupFor(removedMorph);
     if (cellGroup) cellGroup.morph = null;
     super.onSubmorphRemoved(removedMorph);
-  }
-
-  inspect(pointerId) {
-    return new GridLayoutHalo(this.container, pointerId);
   }
 
   ensureGrid({grid, rowCount, columnCount}) {
