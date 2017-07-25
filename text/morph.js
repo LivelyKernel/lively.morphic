@@ -10,14 +10,12 @@ import {Range} from "./range.js";
 import {eqPosition, lessPosition} from "./position.js";
 import KeyHandler from "../events/KeyHandler.js";
 import {Label} from "./label.js";
-import InputLine from "./input-line.js";
 import {Snippet} from "./snippets.js";
 import {UndoManager} from "../undo.js";
 import {TextSearcher} from "./search.js";
 import TextLayout from "./layout.js";
 import Renderer, { extractHTMLFromTextMorph } from "./renderer.js";
 import commands from "./commands.js";
-import { RichTextControl } from "./ui.js";
 import { textAndAttributesWithSubRanges } from "./attributes.js";
 import { serializeMorph, deserializeMorph } from "../serialization.js";
 
@@ -31,10 +29,6 @@ export class Text extends Morph {
       fontSize: 11,
       ...props
     });
-  }
-
-  static makeInputLine(props) {
-    return new InputLine(props);
   }
 
   static get defaultTextStyle() {
@@ -2688,7 +2682,8 @@ export class Text extends Morph {
   // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
   // controls
   openRichTextControl() {
-    return RichTextControl.openDebouncedFor(this);
+    return this.execCommand('open rich text control'); 
+    //RichTextControl.openDebouncedFor(this);
   }
 
   // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-

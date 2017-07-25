@@ -2,41 +2,19 @@
 import { Rectangle, Color, pt } from "lively.graphics";
 import { arr, fun, obj, promise } from "lively.lang";
 import { once, signal } from "lively.bindings";
-import {
-  Morph,
-  Tooltip,
-  List,
-  FilterableList,
-  Image,
-  inspect,
-  config,
-  MorphicEnv,
-  Window,
-  Menu
-} from "./index.js";
-import { StatusMessage, StatusMessageForMorph } from './components/markers.js';
-import { TooltipViewer } from "./components/tooltips.js";
+import { Morph, inspect, config, MorphicEnv } from "./index.js";
+import { Tooltip, TooltipViewer } from './tooltips.js';
 
-import {
-  InformPrompt,
-  ConfirmPrompt,
-  MultipleChoicePrompt,
-  TextPrompt,
-  EditPrompt,
-  PasswordPrompt,
-  ListPrompt,
-  EditListPrompt
-} from "./components/prompts.js";
-import { loadMorphFromSnapshot, loadWorldFromResource } from "./serialization.js";
+import { loadMorphFromSnapshot } from "./serialization.js";
 import { loadObjectFromPartsbinFolder } from "./partsbin.js";
 import { uploadFile } from "./events/html-drop-handler.js";
 import worldCommands from "./world-commands.js";
 import { loadWorldFromURL, loadWorld } from "./world-loading.js";
-import LoadingIndicator from "./components/loading-indicator.js";
-import { GradientEditor } from "./ide/styling/gradient-editor.js";
+
+import { UserUI } from "lively.user/morphic/user-ui.js";
 
 export class World extends Morph {
-
+  
   static get properties() {
     return {
 
@@ -62,21 +40,13 @@ export class World extends Morph {
 
       styleSheets: {
         initialize() {
-          this.styleSheets = [
-            StatusMessage.styleSheet,
-            Window.styleSheet,
-            FilterableList.styleSheet,
-            List.styleSheet,
-            LoadingIndicator.styleSheet,
-            GradientEditor.styleSheet,
-            Tooltip.styleSheet
-          ];
+          this.execCommand('install themes');
         }
       }
 
     };
   }
-
+  
   static defaultWorld() { return MorphicEnv.default().world; }
 
   static async loadWorldFromURL(url, oldWorld = this.defaultWorld(), options = {}) {
@@ -157,7 +127,7 @@ export class World extends Morph {
   getPrompts() { return this.submorphs.filter(ea => ea.isPrompt); }
 
   openInWindow(morph, opts = {title: morph.name, name: "window for " + morph.name}) {
-    let win = new Window({
+    let win = this.execCommand('create window', {
       ...opts,
       extent: morph.extent.addXY(0, 25),
       targetMorph: morph
@@ -321,12 +291,12 @@ export class World extends Morph {
   // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
   // html5 drag - drop
 
-  async nativeDrop_ensureUploadIndicator() {
+  async ensureUploadIndicator() {
     if (!this._cachedDragIndicator)
       this._cachedDragIndicator = loadObjectFromPartsbinFolder("upload-indicator");
     let i = await this._cachedDragIndicator;
     if (!i.world()) i.openInWorld();
-    fun.debounceNamed("remove-uploadd-indicator", 1000, () => {
+    fun.debounceNamed("remove-upload-indicator", 1000, () => {
       this.nativeDrop_removeUploadIndicator();
     })();
   }
@@ -519,7 +489,7 @@ export class World extends Morph {
     var eventState =  this.env.eventDispatcher.eventState;
     if (eventState.menu) eventState.menu.remove();
     return eventState.menu = items && items.length ?
-      Menu.openAtHand(items, {hand: (evt && evt.hand) || this.firstHand}) : null;
+      this.execCommand("open menu at hand", {items, hand: (evt && evt.hand) || this.firstHand}) : null;
   }
 
   onWindowScroll(evt) {
@@ -713,6 +683,10 @@ export class World extends Morph {
       null;
   }
 
+  openLoadingIndicator(infoString) {
+    return this.execCommand('open loading indicator', infoString)
+  }
+
   openStatusMessage(statusMessage, delay) {
     // $world.setStatusMessage("test", Color.green)
 
@@ -760,6 +734,10 @@ export class World extends Morph {
   async openPrompt(promptMorph, opts = {requester: null, animated: false}) {
     var focused = this.focusedMorph, visBounds = this.visibleBounds();
 
+    if (!promptMorph) {
+      throw Error('Prompt can not be initialized! Did you forget to load lively.components?');
+    }
+
     promptMorph.openInWorldNear(
       opts.requester ?
         visBounds.constrainPt(opts.requester.globalBounds().center()) :
@@ -783,7 +761,7 @@ export class World extends Morph {
   }
 
   inform(label = "no message", opts = {fontSize: 16, requester: null, animated: true}) {
-    return this.openPrompt(new InformPrompt({label, ...opts}), opts);
+    return this.openPrompt(this.execCommand('create inform prompt', {label, ...opts}), opts);
   }
 
   prompt(label, opts = {requester: null, input: "", historyId: null, useLastInput: false}) {
@@ -793,30 +771,30 @@ export class World extends Morph {
     //   historyId: STRING, -- id to identify the input history for this prompt
     //   useLastInput: BOOLEAN -- use history for default input?
     // }
-    return this.openPrompt(new TextPrompt({label, ...opts}), opts);
+    return this.openPrompt(this.execCommand('create text prompt', {label, ...opts}), opts);
   }
 
   editPrompt(label, opts = {requester: null, input: "", historyId: null, useLastInput: false, textStyle: null, mode: null, evalEnvironment: null}) {
-    return this.openPrompt(new EditPrompt({label, ...opts}), opts);
+    return this.openPrompt(this.execCommand('create edit prompt', {label, ...opts}), opts);
   }
 
   passwordPrompt(label, opts = {requester: null, input: ""}) {
     // await this.world().passwordPrompt("secret")
-    return this.openPrompt(new PasswordPrompt({label, ...opts}), opts);
+    return this.openPrompt(this.execCommand("create password prompt", {label, ...opts}), opts);
   }
 
   confirm(label, opts = {requester: null, animated: true}) {
     // await this.world().confirm("test")
-    return this.openPrompt(new ConfirmPrompt({label, ...opts}), opts);
+    return this.openPrompt(this.execCommand('create confirm prompt', {label, ...opts}), opts);
   }
 
   multipleChoicePrompt(label, opts = {requester: null, animated: true, choices: []}) {
     // await this.world().multipleChoicePrompt("test", {choices: ["1","2","3","4"]})
-    return this.openPrompt(new MultipleChoicePrompt({label, ...opts}), opts);
+    return this.openPrompt(this.execCommand('create multiple choice prompt', {label, ...opts}), opts);
   }
 
   listPrompt(label = "", items = [], opts = {requester: null, onSelection: null, preselect: 0}) {
-    return this.openPrompt(new ListPrompt({
+    return this.openPrompt(this.execCommand("create list command", {
       filterable: false, padding: Rectangle.inset(3),
       label, items, ...opts}), opts);
   }
@@ -843,13 +821,13 @@ export class World extends Morph {
       return this.openPrompt(opts.prompt, opts);
     }
 
-    return this.openPrompt(new ListPrompt({
+    return this.openPrompt(this.execCommand("create list prompt", {
       filterable: true, padding: Rectangle.inset(3),
       label, items, ...opts}), opts);
   }
 
   editListPrompt(label = "", items = [], opts = {requester: null, multiSelect: true, historyId: null}) {
-    return this.openPrompt(new EditListPrompt({
+    return this.openPrompt(this.execCommand("create edit list prompt", {
       label, multiSelect: true, items, padding: Rectangle.inset(3), ...opts}), opts);
   }
 }

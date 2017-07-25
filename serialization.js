@@ -67,7 +67,7 @@ export async function saveWorldToResource(world = World.defaultWorld(), toResour
   // pretty printing bloats 2x!
   let i;
   if (showIndicator) {
-    i = LoadingIndicator.open(typeof showIndicator === "string" ?
+    i = world.openLoadingIndicator(typeof showIndicator === "string" ?
       showIndicator : "Snapshotting...");
     await i.whenRendered(); await promise.delay(100);
   }
@@ -91,7 +91,6 @@ export function copyMorph(morph) {
 import { createFiles } from "lively.resources";
 import { ensurePackage } from "lively.modules";
 import ObjectPackage from "lively.classes/object-classes.js";
-import LoadingIndicator from "./components/loading-indicator.js";
 import { promise } from "lively.lang";
 import { migrations } from "./object-migration.js";
 import { ObjectMigrationPlugin } from "lively.serializer2/plugins.js";

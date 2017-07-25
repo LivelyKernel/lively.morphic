@@ -1,5 +1,4 @@
 import { obj, arr, promise } from "lively.lang";
-import LoadingIndicator from "./components/loading-indicator.js";
 
 function printArg(x) {
   return obj.inspect(x, {maxDepth: 1}).replace(/\n/g, "").replace(/\s+/g, " ");
@@ -59,7 +58,7 @@ export default class CommandHandler {
     var world = morph.world(), progressIndicator, result;
 
     if (typeof command.progressIndicator === "string")
-      progressIndicator = LoadingIndicator.open(command.progressIndicator);
+      progressIndicator = world.openLoadingIndicator(command.progressIndicator);
 
     if (typeof command.exec === "function") {
         try {

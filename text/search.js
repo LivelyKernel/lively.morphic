@@ -1,11 +1,10 @@
+/* global System */
 import { Rectangle, rect, pt, Color } from "lively.graphics";
 import { connect, disconnect } from "lively.bindings"
 import { obj, promise, Path } from "lively.lang";
-import { Morph, GridLayout, StyleSheet, Text } from "../index.js";
+import { Morph, GridLayout, StyleSheet, Text, Icon } from "lively.morphic";
 import { lessPosition, minPosition, maxPosition } from "./position.js";
 import { occurStartCommand } from "./occur.js";
-import { Icon } from "../components/icons.js";
-import { Button } from "../components/buttons.js";
 
 // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 // finds string / regexp matches in text morphs
