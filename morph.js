@@ -17,6 +17,7 @@ import { isNumber, isString } from "lively.lang/object.js";
 import { capitalize } from "lively.lang/string.js";
 import { connect, signal } from "lively.bindings";
 import { StylingVisitor } from "./sizzle.js";
+import { showAndSnapToGuides, removeSnapToGuidesOf } from './drag-guides.js';
 
 const defaultCommandHandler = new CommandHandler();
 
@@ -577,7 +578,7 @@ export class Morph {
             value ? obj.extract(value, ["top", "left", "right", "bottom"], (k, v) => {
               return obj.isArray(v) ? Color.fromTuple(v) : v
             }) : value
-          ); 
+          );
         }
       },
 
@@ -2194,13 +2195,13 @@ export class Morph {
 
   onDragEnd(evt) {
     this.undoStop("drag-move");
-    this.execCommand("remove snap guides", this);
+    removeSnapToGuidesOf(this);
   }
 
   onDrag(evt) {
     let {dragStartMorphPosition, absDragDelta} = evt.state;
     this.position = dragStartMorphPosition.addPt(absDragDelta);
-    this.execCommand("show and snap to guides", this, evt.isCtrlDown()/*show guides*/, evt.isCtrlDown()/*snap*/);
+    showAndSnapToGuides(this, evt.isCtrlDown()/*show guides*/, evt.isCtrlDown()/*snap*/);
   }
 
   onGrab(evt) {
