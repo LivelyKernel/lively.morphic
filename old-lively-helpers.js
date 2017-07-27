@@ -1,7 +1,7 @@
 // For getting a new Morphic world setup in old Lively
 import { num, arr } from "lively.lang";
 import { pt, Color, Point } from "lively.graphics";
-import { morph, MorphicEnv, show } from "lively.morphic";
+import { morph, MorphicEnv } from "lively.morphic";
 import { ObjectDrawer, Workspace } from "lively.morphic/tools.js";
 import { Window } from "lively.morphic/widgets.js";
 

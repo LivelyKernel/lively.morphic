@@ -53,12 +53,3 @@ export function morph(props = {}, opts = {restore: false}) {
     new klass({[Symbol.for("lively-instance-restorer")]: true}).initFromJSON(props) :
     new klass(props);
 }
-
-async function lazyInspect(obj) {
-  // lazy load
-  var {inspect: realInspect} = await System.import("lively.ide/js/inspector.js")
-  inspect = realInspect;
-  return realInspect(obj);
-}
-
-export var inspect = lazyInspect;

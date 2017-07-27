@@ -1,7 +1,7 @@
 /*global System*/
 import { Rectangle, rect, Color, pt } from 'lively.graphics';
 import { tree, Path, arr, string, obj } from "lively.lang";
-import { show, inspect, Text, config } from "./index.js";
+import { inspect, Text, config } from "./index.js";
 import KeyHandler from "./events/KeyHandler.js";
 import { saveWorldToResource, loadWorldFromResource } from "./serialization.js";
 import { loadObjectFromPartsbinFolder } from "./partsbin.js";
@@ -143,7 +143,7 @@ var commands = [
 
   {
     name: "escape",
-    exec: (world, _1, _2, evt) => {    
+    exec: (world, _1, _2, evt) => {
       var eventState =  world.env.eventDispatcher.eventState;
       if (eventState.menu) eventState.menu.remove();
       var halos = world.halos();
@@ -536,17 +536,17 @@ var commands = [
       } else {
         let { interactivelyLoadObjectFromPartsBinFolder } = await System.import("lively.morphic/partsbin.js");
         part = await interactivelyLoadObjectFromPartsBinFolder();
-      }          
+      }
       if (part && open) part.openInWorldNearHand();
       return part;
     }
   },
 
-  
+
   {
     name: "open object drawer",
     exec: async world => {
-      var { default: ObjectDrawer } = await System.import("lively.morphic/components/object-drawer.js")
+      var { default: ObjectDrawer } = await System.import("lively.components/object-drawer.js")
       return new ObjectDrawer().openInWorldNearHand();
     }
   },
@@ -562,17 +562,6 @@ var commands = [
             "lively.ide/js/objecteditor/index.js"),
           { target, className, methodName } = args;
       return await ObjectEditor.open(args);
-    }
-  },
-
-  {
-    name: "open object inspector",
-    exec: async (world, args = {target: null}) => {
-      if (!args.target) {
-        world.setStatusMessage("no target for Inspector");
-        return null;
-      }
-      return inspect(args.target);
     }
   },
 
@@ -867,16 +856,6 @@ var commands = [
   },
 
   {
-    name: "install global inspect and show",
-    exec: world => {
-      window.show = show;
-      window.inspect = inspect;
-      world.setStatusMessage(`inspect() and show() are now globally available`);
-      return true;
-    }
-  },
-
-  {
     name: "save world",
     exec: async (world, args, _, evt) => {
       // in case there is another morph implementing save...
@@ -886,7 +865,7 @@ var commands = [
       let dialog = await loadObjectFromPartsbinFolder("save world dialog"),
           {destination, name} = await $world.openPrompt(dialog, {targetWorld: world});
 
-      if (!name) return null;      
+      if (!name) return null;
 
       let url;
       if (destination === "server")
@@ -907,7 +886,7 @@ var commands = [
       }
     }
   },
-  
+
   {
     name: "load world",
     exec: async (oldWorld, args = {}) => {

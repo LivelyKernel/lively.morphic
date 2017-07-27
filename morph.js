@@ -6,7 +6,7 @@ import {
   AnimationQueue,
   ShadowObject
 } from "./rendering/morphic-default.js";
-import { morph, Icon, show } from "./index.js";
+import { morph, Icon } from "./index.js";
 import { MorphicEnv } from "./env.js";
 import config from "./config.js";
 import CommandHandler from "./CommandHandler.js";
@@ -42,6 +42,8 @@ function generateUnfolded(propName, members=['top', 'left', 'right', 'bottom'], 
   }
   return propertyDeclarations
 }
+
+export const commands = [];
 
 export class Morph {
 
@@ -917,7 +919,7 @@ export class Morph {
     return {sort: false, includeDefault: false, properties};
   }
 
-  show() { return show(this); }
+  show() { return this.execCommand("show marker", this); }
 
   setStatusMessage(msg, color, delay, opts) {
     var w = this.world();
@@ -2490,7 +2492,7 @@ return ;
   // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
   // commands
   // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-  get commands() { return this._commands || []; }
+  get commands() { return [...(this._commands || []), ...commands]; }
   set commands(cmds) {
     if (this._commands) this.removeCommands(this._commands);
     this.addCommands(cmds);

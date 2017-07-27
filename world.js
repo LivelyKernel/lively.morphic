@@ -14,7 +14,7 @@ import { loadWorldFromURL, loadWorld } from "./world-loading.js";
 import { UserUI } from "lively.user/morphic/user-ui.js";
 
 export class World extends Morph {
-  
+
   static get properties() {
     return {
 
@@ -31,7 +31,7 @@ export class World extends Morph {
 
       showsUserFlap: {
         defaultValue: true,
-        set(bool) {          
+        set(bool) {
           this.setProperty("showsUserFlap", bool);
           System.import("lively.user/morphic/user-ui.js")
             .then(userUI => userUI.UserUI[bool ? "showUserFlap" : "hideUserFlap"](this));
@@ -46,7 +46,7 @@ export class World extends Morph {
 
     };
   }
-  
+
   static defaultWorld() { return MorphicEnv.default().world; }
 
   static async loadWorldFromURL(url, oldWorld = this.defaultWorld(), options = {}) {
