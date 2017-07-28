@@ -87,6 +87,9 @@
           }
           Promise.all([
             lively.modules.importPackage('lively.morphic'),
+            lively.modules.importPackage('lively.components'),
+            lively.modules.importPackage('lively.halos'),
+            lively.modules.importPackage('lively.ide'),
             lively.lang.promise.waitFor(function() { return loginDone; })
           ]).then(function(result) {
             var morphic = result[0];
