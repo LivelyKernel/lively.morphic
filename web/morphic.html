@@ -50,7 +50,7 @@
               .catch(function(err) { console.error(err); });
           } else loginDone = true;
         });
-      
+
       Promise.resolve()
         .then(polyfills)
         .then(bootstrapLivelySystem)
@@ -85,15 +85,26 @@
             document.body.innerHTML = "<h1>" + msg + "</h1>";
             throw new Error(msg);
           }
-          Promise.all([
-            lively.modules.importPackage('lively.morphic'),
-            lively.modules.importPackage('lively.components'),
-            lively.modules.importPackage('lively.halos'),
-            lively.modules.importPackage('lively.ide'),
+          return Promise.all([
+            importPackageAndDo(
+              'lively.components',
+              function(m) { lively.components = m; }
+            ),
+            importPackageAndDo(
+              'lively.halos',
+              function(m) { lively.halos = m; }
+            ),
+            importPackageAndDo(
+              'lively.ide',
+              function(m) { lively.ide = m; }
+            ),
+            importPackageAndDo(
+              'lively.morphic',
+              function(m) { return lively.morphic = m; }
+            ),
             lively.lang.promise.waitFor(function() { return loginDone; })
-          ]).then(function(result) {
-            var morphic = result[0];
-            return morphic.World.loadWorldFromURL(worldLocation.resource, null, {
+          ]).then(function() {
+            return lively.morphic.World.loadWorldFromURL(worldLocation.resource, null, {
               verbose: true,
               localconfig: true,
               l2l: true,
@@ -105,8 +116,22 @@
             });
           })
         })
-        .then(function() { worldLoaded = true; console.log("...lively.morphic world created"); })
-        .catch(function(err) {
+        .then(function(world) {
+          // install style sheets
+          let {Window, FilterableList, List, LoadingIndicator} = lively.components,
+              {Tooltip} = lively.morphic,
+              {StatusMessage} = lively.halos;
+          world.styleSheets = [
+            Window.styleSheet,
+            FilterableList.styleSheet,
+            List.styleSheet,
+            LoadingIndicator.styleSheet,
+            Tooltip.styleSheet,
+            StatusMessage.styleSheet
+          ];
+          worldLoaded = true;
+          console.log("...lively.morphic world created");
+        }).catch(function(err) {
           if (err.originalErr) err = err.originalErr;
           console.error(err);
           var printed = err.message;
