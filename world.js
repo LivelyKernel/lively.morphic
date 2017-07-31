@@ -2,7 +2,7 @@
 import { Rectangle, Color, pt } from "lively.graphics";
 import { arr, fun, obj, promise } from "lively.lang";
 import { once, signal } from "lively.bindings";
-import { Morph, inspect, config, MorphicEnv } from "./index.js";
+import { Morph, Image, inspect, config, MorphicEnv } from "./index.js";
 import { Tooltip, TooltipViewer } from './tooltips.js';
 
 import { loadMorphFromSnapshot } from "./serialization.js";
@@ -35,12 +35,6 @@ export class World extends Morph {
           this.setProperty("showsUserFlap", bool);
           System.import("lively.user/morphic/user-ui.js")
             .then(userUI => userUI.UserUI[bool ? "showUserFlap" : "hideUserFlap"](this));
-        }
-      },
-
-      styleSheets: {
-        initialize() {
-          this.execCommand('install themes');
         }
       }
 
