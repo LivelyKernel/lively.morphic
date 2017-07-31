@@ -1348,6 +1348,9 @@ commands.push(...codeCommands);
 import { commands as richTextCommands } from "./rich-text-commands.js";
 commands.push(...richTextCommands);
 
+import { occurStartCommand } from './occur.js';
+commands.push(occurStartCommand);
+
 export default commands;
 
 // lively.modules.module("lively.morphic/text/morph.js").reload({reloadDeps: false, resetEnv: false});

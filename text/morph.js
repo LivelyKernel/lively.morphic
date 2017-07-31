@@ -10,7 +10,6 @@ import {Range} from "./range.js";
 import {eqPosition, lessPosition} from "./position.js";
 import KeyHandler from "../events/KeyHandler.js";
 import {Label} from "./label.js";
-import {Snippet} from "./snippets.js";
 import {UndoManager} from "../undo.js";
 import {TextSearcher} from "./search.js";
 import TextLayout from "./layout.js";
@@ -20,7 +19,7 @@ import { textAndAttributesWithSubRanges } from "./attributes.js";
 import { serializeMorph, deserializeMorph } from "../serialization.js";
 
 export class Text extends Morph {
-  
+
   static makeLabel(value, props) {
     return new Label({
       value,
@@ -49,6 +48,22 @@ export class Text extends Morph {
     for (let prop in properties)
       if (properties[prop].isDefaultTextStyleProp) styleProps.push(prop);
     return (this._defaultTextStyleProps = styleProps);
+  }
+
+  static basicFontItems() {
+    return [
+      "Sans-serif",
+      "serif",
+      "Monospace",
+      "Arial Black",
+      "Arial Narrow",
+      "Comic Sans MS",
+      "Garamond",
+      "Tahoma",
+      "Trebuchet MS",
+      "Verdana",
+      "custom..."
+    ].map(ea => ({isListItem: true, label: [ea, {fontFamily: ea}], value: ea}));
   }
 
   static get properties() {
@@ -355,7 +370,7 @@ export class Text extends Morph {
 
       fontFamily: {
         type: "Enum",
-        values: RichTextControl.basicFontItems().map(f => f.value),
+        values: this.basicFontItems().map(f => f.value),
         defaultValue: "Sans-Serif",
         isStyleProp: true,
         isDefaultTextStyleProp: true,
@@ -2294,11 +2309,7 @@ export class Text extends Morph {
   }
 
   get snippets() {
-    return this.pluginCollect("getSnippets", []).map(snippet => {
-      if (snippet.isTextSnippet) return snippet;
-      var [trigger, expansion] = snippet;
-      return new Snippet({trigger, expansion});
-    });
+    return this.execCommand('get snippets');
   }
 
   onKeyDown(evt) {
@@ -2682,7 +2693,7 @@ export class Text extends Morph {
   // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
   // controls
   openRichTextControl() {
-    return this.execCommand('open rich text control'); 
+    return this.execCommand('open rich text control');
     //RichTextControl.openDebouncedFor(this);
   }
 
