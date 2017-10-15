@@ -28,7 +28,7 @@ import { List, DropDownList } from "lively.components/list.js";
 import { HTMLMorph } from './html-morph.js';
 import Window from "lively.components/window.js";
 import InputLine from "./text/input-line.js";
-export { Window };
+export { Window, InputLine };
 
 export function morph(props = {}, opts = {restore: false}) {
   var klass = Morph;
@@ -63,7 +63,7 @@ export function morph(props = {}, opts = {restore: false}) {
 
 async function lazyInspect(obj) {
   // lazy load
-  var {inspect: realInspect} = await System.import("lively.morphic/ide/js/inspector.js")
+  var {inspect: realInspect} = await System.import("lively.ide/js/inspector.js")
   inspect = realInspect;
   return realInspect(obj);
 }
