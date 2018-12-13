@@ -520,7 +520,9 @@ export class HorizontalLayout extends FloatLayout {
       if (direction === "centered") {
         var leftOffset = layoutableSubmorphs[0].left;
         w = arr.last(layoutableSubmorphs).right + leftOffset
-      } else  {
+      } else  if (rightToLeft) {
+        w = arr.first(layoutableSubmorphs).right + spacing
+      } else {
         w = arr.last(layoutableSubmorphs).right + spacing;
       }
     
