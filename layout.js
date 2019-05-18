@@ -457,6 +457,8 @@ export class HorizontalLayout extends FloatLayout {
     // supported directions: "leftToRight", "rightToLeft", "centered"
     this._direction = props.direction || "leftToRight";
     // top, center, bottom
+    this._resizeSubmorphs = typeof props.resizeSubmorphs !== "undefined" ?
+                              props.resizeSubmorphs : false;
     this._align = props.align || "top";
   }
 
@@ -478,6 +480,9 @@ export class HorizontalLayout extends FloatLayout {
 
   get spacing() { return this._spacing; }
   set spacing(offset) { this._spacing = offset; this.apply(); }
+  
+  get resizeSubmorphs() { return this._resizeSubmorphs }
+  set resizeSubmorphs(bool) { this._resizeSubmorphs = bool; this.apply(); }
 
   __serialize__() {
     return {
@@ -494,16 +499,33 @@ export class HorizontalLayout extends FloatLayout {
   async apply(animate = false) {
     if (this.active || !this.container || !this.container.submorphs.length) return;
 
-    var { direction, align, spacing, container, autoResize, layoutableSubmorphs } = this;
+    var { direction, align, spacing, container, autoResize, layoutableSubmorphs, padding, resizeSubmorphs } = this;
 
     if (!layoutableSubmorphs.length) return;
 
     super.apply(animate);
+    let
+      padLeft = padding ? padding.left() : 0,
+      padRight = padding ? padding.right() : 0,
+      padTop = padding ? padding.top() : 0,
+      padBottom = padding ? padding.bottom() : 0,   
+      containerHeight = container.height,
+      submorphHeight = containerHeight - spacing*2 - padTop - padBottom;
+    
     this.active = true;
     this.maxHeight = 0;
 
     var minExtent = this.computeMinContainerExtent(spacing, container, layoutableSubmorphs);
-    if (!autoResize) minExtent = minExtent.maxPt(container.extent);
+    if (!autoResize) {
+      minExtent = minExtent.maxPt(container.extent);
+      if (resizeSubmorphs) {
+        for (let m of layoutableSubmorphs) {
+          if (m.height !== submorphHeight)
+            m.height = submorphHeight;
+         }
+         this.forceLayoutsInNextLevel();
+       }
+    }
 
     var startX = 0, rightToLeft = false;
     if (direction === "rightToLeft") {
@@ -522,7 +544,9 @@ export class HorizontalLayout extends FloatLayout {
       if (direction === "centered") {
         var leftOffset = layoutableSubmorphs[0].left;
         w = arr.last(layoutableSubmorphs).right + leftOffset
-      } else  {
+      } else  if (rightToLeft) {
+        w = arr.first(layoutableSubmorphs).right + spacing
+      } else {
         w = arr.last(layoutableSubmorphs).right + spacing;
       }
     
